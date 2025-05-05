@@ -51,6 +51,7 @@ import car from "@/assets/icons/car.png";
 import carJson from "@/assets/images/car.json";
 import locationJson from "@/assets/images/location.json";
 import filter from "@/assets/icons/filter.png";
+import repeat from "@/assets/icons/repeat.png";
 export const images = {
     onboarding1,
     onboarding2,
@@ -107,7 +108,8 @@ export const icons = {
     ar,
     en,
     location,
-    filter
+    filter,
+    repeat
 };
 
 
