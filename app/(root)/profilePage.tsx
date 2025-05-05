@@ -53,6 +53,7 @@ const Profile = () => {
   
   const [isUploading, setIsUploading] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
+  const [showFullCarImage, setShowFullCarImage] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [expandedCards, setExpandedCards] = useState({
     driverInfo: true,
@@ -453,11 +454,13 @@ const Profile = () => {
                 </View>
                 {expandedCards.carImage && (
                   <View className="mt-4">
-                    <Image
-                      source={{ uri: userData.data.driver.car_image_url }}
-                      className="w-full h-48 rounded-lg"
-                      resizeMode="cover"
-                    />
+                    <TouchableOpacity onPress={() => setShowFullCarImage(true)}>
+                      <Image
+                        source={{ uri: userData.data.driver.car_image_url }}
+                        className="w-full h-48 rounded-lg"
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
                   </View>
                 )}
               </TouchableOpacity>
@@ -574,6 +577,25 @@ const Profile = () => {
               uri: userData.profileImage || user?.imageUrl || 'https://www.pngitem.com/pimgs/m/146-1468479_my-profile-icon-blank-profile-picture-circle-hd.png'
             }}
             className="w-80 h-80 rounded-xl"
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Full Car Image Modal */}
+      <Modal
+        visible={showFullCarImage}
+        transparent={true}
+        onRequestClose={() => setShowFullCarImage(false)}
+      >
+        <TouchableOpacity 
+          className="flex-1 bg-black/90 items-center justify-center"
+          onPress={() => setShowFullCarImage(false)}
+          activeOpacity={1}
+        >
+          <Image
+            source={{ uri: userData.data?.driver?.car_image_url }}
+            className="w-full h-96"
             resizeMode="contain"
           />
         </TouchableOpacity>
