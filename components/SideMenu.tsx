@@ -1,34 +1,21 @@
 import React, { useState } from 'react';
-import { View, Text, Switch, TouchableOpacity, Share, Platform, Linking } from 'react-native';
-import { DrawerContentScrollView, DrawerContentComponentProps } from '@react-navigation/drawer';
+import { View, Text, Switch, TouchableOpacity, Share, Platform, Linking, Image } from 'react-native';
+import { ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useLanguage } from '@/context/LanguageContext';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as Location from 'expo-location';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { useLocationStore } from '@/store';
 
-interface MenuItemProps {
-  icon: string;
-  label: string;
-  onPress?: () => void;
-  iconBg?: string;
-  iconColor?: string;
-  labelBold?: boolean;
-  trailingComponent?: React.ReactNode;
-  trailingText?: string;
-  subtext?: string;
-}
-
-export default function SideMenu(props: DrawerContentComponentProps) {
+export default function SideMenu() {
   const { language, setLanguage } = useLanguage();
   const { userAddress } = useLocationStore();
   const { signOut } = useAuth();
   const { user } = useUser();
-  const router = useRouter();
-  const isRTL = false; // Set to true if you want RTL support
+  const isRTL = false;
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [locationEnabled, setLocationEnabled] = useState(true);
@@ -79,146 +66,152 @@ export default function SideMenu(props: DrawerContentComponentProps) {
   };
 
   return (
-    <DrawerContentScrollView
-      {...props}
+    <ScrollView
       contentContainerStyle={{
         flexGrow: 1,
         backgroundColor: '#fff',
-        borderTopRightRadius: 22,
-        borderBottomRightRadius: 22,
-        paddingHorizontal: 16,
-        paddingTop: 32,
+        paddingHorizontal: 18,
+        paddingTop: 24,
         paddingBottom: 12,
       }}
+      className="rounded-tr-[22px] rounded-br-[22px]"
     >
-        <Text style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 16 }}>Settings</Text>
-        {/* User Info Section */}
-        <View style={{ marginBottom: 18, alignItems: 'flex-start' }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#f97316', marginBottom: 2 }}>
-            {user?.fullName || user?.firstName || 'User'}
-          </Text>
-          {user?.phoneNumbers && user.phoneNumbers.length > 0 && user.phoneNumbers[0]?.phoneNumber && (
-            <Text style={{ fontSize: 15, color: '#444', marginBottom: 1 }}>{user.phoneNumbers[0].phoneNumber}</Text>
-          )}
-          {user?.primaryEmailAddress?.emailAddress && (
-            <Text style={{ fontSize: 15, color: '#666' }}>{user.primaryEmailAddress.emailAddress}</Text>
-          )}
-        </View>
-        {/* Decorative Orange Line */}
-        <View style={{ height: 3, backgroundColor: '#f97316', borderRadius: 2, marginBottom: 20, width: '100%' }} />
-        {/* Preferences Section */}
-        <Text style={{ color: '#9ca3af', fontSize: 13, marginBottom: 8, fontWeight: '600' }}>Preferences</Text>
-        <MenuItem
-          icon="language"
-          label="Language"
-          onPress={toggleLanguage}
-          iconBg="#f97316"
-          iconColor="#fff"
-          labelBold
-          trailingText={language === 'ar' ? 'العربية' : 'English'}
-        />
-        <MenuItem
-          icon="notifications"
-          label="Notifications"
-          trailingComponent={<Switch value={notificationsEnabled} onValueChange={toggleNotifications} />}
-          iconBg="#f97316"
-          iconColor="#fff"
-          labelBold
-        />
-        <MenuItem
-          icon="location-on"
-          label="Location"
-          onPress={toggleLocation}
-          iconBg="#f97316"
-          iconColor="#fff"
-          labelBold
-          subtext={userAddress || 'الموقع الحالي'}
-        />
-        {/* Support Section */}
-        <View style={{ height: 24 }} />
-        <Text style={{ color: '#9ca3af', fontSize: 13, marginBottom: 8, fontWeight: '600' }}>Support</Text>
-        <MenuItem
-          icon="share"
-          label="Share App"
-          onPress={handleShare}
-          iconBg="#f97316"
-          iconColor="#fff"
-          labelBold
-        />
-        <MenuItem
-          icon="star"
-          label="Rate Us"
-          onPress={handleRate}
-          iconBg="#f97316"
-          iconColor="#fff"
-          labelBold
-        />
-        <MenuItem
-          icon="privacy-tip"
-          label="Privacy Policy"
-          onPress={() => router.push('/(root)/privacy-policy')}
-          iconBg="#f97316"
-          iconColor="#fff"
-          labelBold
-        />
-        <MenuItem
-          icon="help-outline"
-          label="Help & Support"
-          onPress={() => router.push('/(root)/help')}
-          iconBg="#f97316"
-          iconColor="#fff"
-          labelBold
-        />
-        {/* Account Section */}
-        <View style={{ flex: 1 }} />
-        <View style={{ height: 24 }} />
-        <Text style={{ color: '#9ca3af', fontSize: 13, marginBottom: 8, fontWeight: '600' }}>Account</Text>
-        <MenuItem
-          icon="logout"
-          label="Logout"
-          onPress={async () => { await signOut(); }}
-          iconBg="#fee2e2"
-          iconColor="#ef4444"
-          labelBold
-        />
-    </DrawerContentScrollView>
-  );
-
-// Helper MenuItem component
-function MenuItem({ icon, label, onPress, iconBg, iconColor, labelBold, trailingComponent, trailingText, subtext }: MenuItemProps) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={onPress ? 0.7 : 1}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-        minHeight: 44,
-      }}
-    >
-      <View
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 18,
-          backgroundColor: iconBg || '#f3f4f6',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginRight: 14,
-        }}
-      >
-        <MaterialIcons name={icon} size={22} color={iconColor || '#f97316'} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 16, fontWeight: labelBold ? 'bold' : '500', color: '#222' }}>{label}
-          {trailingText ? <Text style={{ color: '#6b7280', fontSize: 14 }}>  {trailingText}</Text> : null}
+      {/* User Info Section */}
+      <View className="mt-4 mb-6 items-center w-full">
+        <Text className="text-xl font-bold text-black mb-1 text-center">
+          {user?.fullName || user?.firstName || 'User'}
         </Text>
-        {subtext ? <Text style={{ color: '#6b7280', fontSize: 13, marginTop: 2 }}>{subtext}</Text> : null}
+        {user?.primaryEmailAddress?.emailAddress && (
+          <Text className="text-[15px] text-gray-500 text-center">{user.primaryEmailAddress.emailAddress}</Text>
+        )}
       </View>
-      {trailingComponent ? trailingComponent : null}
-    </TouchableOpacity>
-  );
-}
 
+      {/* Decorative Orange Line */}
+      <View className="h-[6px] w-full rounded bg-orange-100 mb-4" />
+
+      {/* Combined Profile & Preferences Section */}
+      <TouchableOpacity
+        onPress={() => router.push('/(root)/profilePageEdit')}
+        activeOpacity={0.7}
+        className="flex-row items-center mb-3 min-h-[44px]"
+      >
+        <View className="w-9 h-9 rounded-full bg-orange-500 items-center justify-center mr-3.5">
+          <MaterialIcons name="edit" size={22} color="#fff" />
+        </View>
+        <Text className="text-base font-bold text-gray-800">Edit Profile</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={toggleLanguage}
+        activeOpacity={0.7}
+        className="flex-row items-center mb-3 min-h-[44px]"
+      >
+        <View className="w-9 h-9 rounded-full bg-orange-500 items-center justify-center mr-3.5">
+          <MaterialIcons name="language" size={22} color="#fff" />
+        </View>
+        <View className="flex-1">
+          <Text className="text-base font-bold text-gray-800">Language</Text>
+          <Text className="text-gray-500 text-sm">
+            {language === 'ar' ? 'العربية' : 'English'}
+          </Text>
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={toggleNotifications}
+        activeOpacity={0.7}
+        className="flex-row items-center mb-3 min-h-[44px]"
+      >
+        <View className="w-9 h-9 rounded-full bg-orange-500 items-center justify-center mr-3.5">
+          <MaterialIcons name="notifications" size={22} color="#fff" />
+        </View>
+        <View className="flex-1 flex-row items-center justify-between">
+          <Text className="text-base font-bold text-gray-800">Notifications</Text>
+          <Switch
+            value={notificationsEnabled}
+            onValueChange={toggleNotifications}
+            trackColor={{ false: '#d1d5db', true: '#f97316' }}
+            thumbColor="#fff"
+          />
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={toggleLocation}
+        activeOpacity={0.7}
+        className="flex-row items-center mb-3 min-h-[44px]"
+      >
+        <View className="w-9 h-9 rounded-full bg-orange-500 items-center justify-center mr-3.5">
+          <MaterialIcons name="location-on" size={22} color="#fff" />
+        </View>
+        <View className="flex-1">
+          <Text className="text-base font-bold text-gray-800">Location</Text>
+          <Text className="text-gray-500 text-[13px] mt-0.5">{userAddress || 'الموقع الحالي'}</Text>
+        </View>
+      </TouchableOpacity>
+      {/* Divider after combined section */}
+      <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 10 }} />
+
+      {/* Support Section */}
+      <Text className="text-gray-400 text-xs mb-2 mt-2 font-semibold tracking-wide">Support</Text>
+      <View className="mb-2">
+        <TouchableOpacity
+          onPress={handleShare}
+          activeOpacity={0.7}
+          className="flex-row items-center mb-3 min-h-[44px]"
+        >
+          <View className="w-9 h-9 rounded-full bg-orange-500 items-center justify-center mr-3.5">
+            <MaterialIcons name="share" size={22} color="#fff" />
+          </View>
+          <Text className="text-base font-bold text-gray-800">Share App</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleRate}
+          activeOpacity={0.7}
+          className="flex-row items-center mb-3 min-h-[44px]"
+        >
+          <View className="w-9 h-9 rounded-full bg-orange-500 items-center justify-center mr-3.5">
+            <MaterialIcons name="star" size={22} color="#fff" />
+          </View>
+          <Text className="text-base font-bold text-gray-800">Rate Us</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => router.push('/(root)/privacy-policy')}
+          activeOpacity={0.7}
+          className="flex-row items-center mb-3 min-h-[44px]"
+        >
+          <View className="w-9 h-9 rounded-full bg-orange-500 items-center justify-center mr-3.5">
+            <MaterialIcons name="privacy-tip" size={22} color="#fff" />
+          </View>
+          <Text className="text-base font-bold text-gray-800">Privacy Policy</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => router.push('/(root)/help')}
+          activeOpacity={0.7}
+          className="flex-row items-center mb-3 min-h-[44px]"
+        >
+          <View className="w-9 h-9 rounded-full bg-orange-500 items-center justify-center mr-3.5">
+            <MaterialIcons name="help-outline" size={22} color="#fff" />
+          </View>
+          <Text className="text-base font-bold text-gray-800">Help & Support</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Divider */}
+      <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 10 }} />
+
+      {/* Account Section */}
+      <Text className="text-gray-400 text-xs mb-2 mt-2 font-semibold tracking-wide">Account</Text>
+      <TouchableOpacity
+        onPress={async () => {
+          await signOut();
+        }}
+        activeOpacity={0.7}
+        className="flex-row items-center mb-3 min-h-[44px]"
+        style={{ backgroundColor: '#fee2e2', borderRadius: 12 }}
+      >
+        <View className="w-9 h-9 rounded-full bg-red-100 items-center justify-center mr-3.5">
+          <MaterialIcons name="logout" size={22} color="#ef4444" />
+        </View>
+        <Text className="text-base font-bold text-red-600">Logout</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
 }

@@ -1,6 +1,6 @@
 import { ClerkLoaded, ClerkProvider } from "@clerk/clerk-expo";
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { Stack, Drawer } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import "react-native-reanimated";
@@ -19,17 +19,12 @@ import { useLanguage } from '@/context/LanguageContext';
 import SideMenu from '@/components/SideMenu';
 import { MenuProvider } from '@/context/MenuContext';
 import * as React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createDrawerNavigator } from '@react-navigation/drawer';
-import HomeScreen from './(root)/(tabs)/home';
-import NotificationsScreen from './(root)/notifications';
 
 const BACKGROUND_NOTIFICATION_TASK = 'ride-notification-service';
 
 // Define the background task
 TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async () => {
   try {
-    // Retrieve userId from AsyncStorage (stored when user logs in)
     const userId = await AsyncStorage.getItem('userId');
     if (userId) {
       await startRideNotificationService(userId);
@@ -51,8 +46,6 @@ if (!publishableKey) {
 }
 
 LogBox.ignoreLogs(["Clerk:"]);
-
-const Drawer = createDrawerNavigator();
 
 export default function RootLayout() {
   const [loaded] = useFonts({
@@ -84,11 +77,8 @@ export default function RootLayout() {
 
     const initializeNotifications = async () => {
       if (user?.id) {
-        // Store userId in AsyncStorage for background task
         await AsyncStorage.setItem('userId', user.id);
-        // Setup notification permissions
         await setupNotifications(user.id);
-        // Initial check for upcoming rides
         await startRideNotificationService(user.id, true);
       }
     };
@@ -98,7 +88,7 @@ export default function RootLayout() {
     const registerBackgroundTask = async () => {
       try {
         await BackgroundFetch.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK, {
-          minimumInterval: 15 * 60, // Run every 15 minutes
+          minimumInterval: 15 * 60,
           stopOnTerminate: false,
           startOnBoot: true,
         });
@@ -121,19 +111,10 @@ export default function RootLayout() {
         <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
           <ClerkLoaded>
             <MenuProvider>
-              <Drawer.Navigator
-                initialRouteName="Home"
-                drawerContent={props => <SideMenu {...props} />}
-                screenOptions={{
-                  drawerStyle: {
-                    backgroundColor: 'transparent', // Make drawer background transparent
-                    width: 280, // Custom width for visible radius
-                  },
-                }}
-              >
-                <Drawer.Screen name="Home" component={HomeScreen} />
-                <Drawer.Screen name="Notifications" component={NotificationsScreen} />
-              </Drawer.Navigator>
+              <Stack>
+                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                <Stack.Screen name="(root)" options={{ headerShown: false }} />
+              </Stack>
             </MenuProvider>
           </ClerkLoaded>
         </ClerkProvider>

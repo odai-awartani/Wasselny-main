@@ -118,6 +118,10 @@ export default function Home() {
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
           setHasPermission(false);
+          Alert.alert(
+            "Location Permission Denied",
+            "Location permission is required to use this feature. Please enable it in your device settings."
+          );
           return;
         }
 
@@ -142,6 +146,14 @@ export default function Home() {
       } catch (err) {
         console.error("Location request failed:", err);
         setHasPermission(false);
+        let message = "Location request failed. Please ensure location services are enabled and permissions are granted in your device settings.";
+        if (err && typeof err === 'object' && 'message' in err && typeof (err as any).message === 'string' && (err as any).message.includes('unsatisfied device settings')) {
+          message = "Location request failed due to unsatisfied device settings. Please enable location services (GPS) and try again.";
+        }
+        Alert.alert(
+          "Location Error",
+          message
+        );
       }
     };
     requestLocation();
@@ -172,50 +184,44 @@ export default function Home() {
   React.useLayoutEffect(() => {
     navigation.setOptions({
       header: () => (
-        <View style={{ flexDirection: 'row', alignItems: 'center', height: 72, backgroundColor: '#fff', paddingHorizontal: 8, borderBottomWidth: 0, elevation: 0, paddingTop: 22 }}>
-          {/* Menu Icon */}
-          <TouchableOpacity onPress={() => navigation.dispatch(DrawerActions.openDrawer())} style={{ marginLeft: 4, marginRight: 8, height: 40, justifyContent: 'center', alignItems: 'center' }}>
+        <View className="flex-row items-center justify-between px-4 py-3 bg-white border-b border-gray-100">
+          <TouchableOpacity 
+            onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+            className="w-10 h-10 items-center justify-center rounded-full bg-gray-100"
+          >
             <CustomDrawerMenuIcon />
           </TouchableOpacity>
-          {/* Title */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' }}>
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#222', textAlign: 'center', lineHeight: 28 }}>Home</Text>
+          
+          <Text className="text-xl font-bold text-gray-900">Home</Text>
+          
+          <View className="flex-row items-center">
+            <TouchableOpacity
+              onPress={() => router.push('/(root)/notifications')}
+              className="w-10 h-10 items-center justify-center rounded-full bg-gray-100 mr-2"
+            >
+              <MaterialIcons name="notifications-none" size={24} color="#f97316" />
+              {unreadCount > 0 && (
+                <View className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full items-center justify-center">
+                  <Text className="text-[10px] text-white font-bold">{unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={() => router.push('/(root)/profile')}
+              className="w-10 h-10 items-center justify-center rounded-full bg-gray-100 overflow-hidden"
+            >
+              {profileImageUrl ? (
+                <Image
+                  source={{ uri: profileImageUrl }}
+                  style={{ width: 40, height: 40, borderRadius: 20 }}
+                  resizeMode="cover"
+                />
+              ) : (
+                <MaterialIcons name="person" size={24} color="#f97316" />
+              )}
+            </TouchableOpacity>
           </View>
-          {/* Notification Icon */}
-          <TouchableOpacity
-            onPress={() => router.push('/(root)/notifications')}
-            style={{ marginHorizontal: 4, padding: 6, height: 40, justifyContent: 'center', alignItems: 'center' }}
-          >
-            <MaterialIcons name="notifications-none" size={28} color="#f97316" />
-            {unreadCount > 0 && (
-              <View style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#EF4444', borderRadius: 8, paddingHorizontal: 4, minWidth: 16, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{unreadCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          {/* Profile Icon */}
-          <TouchableOpacity
-            onPress={() => router.push('/(root)/profilePage')}
-            style={{
-              borderRadius: 20,
-              width: 40,
-              height: 40,
-              overflow: 'hidden',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginLeft: 4,
-            }}
-          >
-            {profileImageUrl ? (
-              <Image
-                source={{ uri: profileImageUrl }}
-                style={{ width: 36, height: 36, borderRadius: 18 }}
-                resizeMode="cover"
-              />
-            ) : (
-              <MaterialIcons name="person" size={28} color="#f97316" />
-            )}
-          </TouchableOpacity>
         </View>
       ),
     });
@@ -223,6 +229,47 @@ export default function Home() {
 
   return (
     <SafeAreaView className="bg-general-500 flex-1">
+      {/* Header */}
+      <View className="flex-row items-center justify-between px-4 py-3 bg-white border-b border-gray-100">
+        <TouchableOpacity 
+          onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+          className="w-10 h-10 items-center justify-center rounded-full bg-gray-100"
+        >
+          <CustomDrawerMenuIcon />
+        </TouchableOpacity>
+        
+        <Text className="text-xl font-bold text-gray-900">Home</Text>
+        
+        <View className="flex-row items-center">
+          <TouchableOpacity
+            onPress={() => router.push('/(root)/notifications')}
+            className="w-10 h-10 items-center justify-center rounded-full bg-gray-100 mr-2"
+          >
+            <MaterialIcons name="notifications-none" size={24} color="#f97316" />
+            {unreadCount > 0 && (
+              <View className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full items-center justify-center">
+                <Text className="text-[10px] text-white font-bold">{unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            onPress={() => router.push('/(root)/profile')}
+            className="w-10 h-10 items-center justify-center rounded-full bg-gray-100 overflow-hidden"
+          >
+            {profileImageUrl ? (
+              <Image
+                source={{ uri: profileImageUrl }}
+                style={{ width: 40, height: 40, borderRadius: 20 }}
+                resizeMode="cover"
+              />
+            ) : (
+              <MaterialIcons name="person" size={24} color="#f97316" />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Content with Barrier Section below Header */}
       <FlatList 
         data={[]}
@@ -322,7 +369,7 @@ export default function Home() {
                 <TouchableOpacity
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    router.push('/create-ride');
+                    router.push('/(root)/create-ride');
                   }}
                   className="flex-row items-center bg-white border border-secondary-700 px-1 py-1 rounded-[15px]"
                   style={{
@@ -374,7 +421,7 @@ export default function Home() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             router.push('/(root)/add');
           }}
-          className="absolute bottom-20 right-5 bg-orange-500 w-14 h-14 rounded-full items-center justify-center shadow-lg"
+          className="absolute bottom-24 right-5 bg-orange-500 w-14 h-14 rounded-full items-center justify-center shadow-lg"
           style={{
             elevation: 5,
             shadowColor: '#000',
