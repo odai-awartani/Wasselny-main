@@ -18,6 +18,11 @@ import { useColorScheme } from 'react-native';
 import { useLanguage } from '@/context/LanguageContext';
 import SideMenu from '@/components/SideMenu';
 import { MenuProvider } from '@/context/MenuContext';
+import * as React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createDrawerNavigator } from '@react-navigation/drawer';
+import HomeScreen from './(root)/(tabs)/home';
+import NotificationsScreen from './(root)/notifications';
 
 const BACKGROUND_NOTIFICATION_TASK = 'ride-notification-service';
 
@@ -46,6 +51,8 @@ if (!publishableKey) {
 }
 
 LogBox.ignoreLogs(["Clerk:"]);
+
+const Drawer = createDrawerNavigator();
 
 export default function RootLayout() {
   const [loaded] = useFonts({
@@ -114,20 +121,19 @@ export default function RootLayout() {
         <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
           <ClerkLoaded>
             <MenuProvider>
-              <Stack
+              <Drawer.Navigator
+                initialRouteName="Home"
+                drawerContent={props => <SideMenu {...props} />}
                 screenOptions={{
-                  headerShown: false,
-                  contentStyle: {
-                    backgroundColor: colorScheme === 'dark' ? '#000' : '#fff',
+                  drawerStyle: {
+                    backgroundColor: 'transparent', // Make drawer background transparent
+                    width: 280, // Custom width for visible radius
                   },
                 }}
               >
-                <Stack.Screen name="index" options={{ headerShown: false }} />
-                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-                <Stack.Screen name="(root)" options={{ headerShown: false }} />
-                <Stack.Screen name="+not-found" />
-              </Stack>
-              <SideMenu />
+                <Drawer.Screen name="Home" component={HomeScreen} />
+                <Drawer.Screen name="Notifications" component={NotificationsScreen} />
+              </Drawer.Navigator>
             </MenuProvider>
           </ClerkLoaded>
         </ClerkProvider>

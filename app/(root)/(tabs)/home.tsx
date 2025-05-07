@@ -21,11 +21,20 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialIcons } from '@expo/vector-icons';
-import Header from "@/components/Header";
 import { useLanguage } from "@/context/LanguageContext";
 import GoogleTextInput from "@/components/GoogleTextInput";
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 
-import SideMenu from '@/components/SideMenu';
+function CustomDrawerMenuIcon() {
+  // Custom menu icon: three lines, middle one shorter and darker (now orange)
+  return (
+    <View style={{ width: 28, height: 28, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ width: 22, height: 4, backgroundColor: '#f97316', borderRadius: 2, marginBottom: 3 }} />
+      <View style={{ width: 14, height: 4, backgroundColor: '#333', borderRadius: 2, marginBottom: 3 }} />
+      <View style={{ width: 22, height: 4, backgroundColor: '#f97316', borderRadius: 2 }} />
+    </View>
+  );
+}
 
 export default function Home() {
   const { setIsMenuVisible } = require('@/context/MenuContext').useMenu();
@@ -38,8 +47,8 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [isDriver, setIsDriver] = useState<boolean>(false);
   const [isCheckingDriver, setIsCheckingDriver] = useState<boolean>(true);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const navigation = useNavigation();
 
   const checkIfUserIsDriver = async () => {
     if (!user?.id) {
@@ -153,7 +162,6 @@ export default function Home() {
       
       setUserLocation(newLocation);
       await AsyncStorage.setItem('userLocation', JSON.stringify(newLocation));
-      setRefreshKey(prev => prev + 1);
     } catch (err) {
       console.error("Refresh failed:", err);
     } finally {
@@ -161,45 +169,31 @@ export default function Home() {
     }
   };
 
-  return (
-    <SafeAreaView className="bg-general-500 flex-1">
-      {/* Side Menu overlay and drawer */}
-      <SideMenu />
-      {/* Fixed Header */}
-      <View className="w-full flex flex-row items-center justify-between px-4 pt-4 pb-2 bg-white" style={{ position: 'relative', minHeight: 56 }}>
-        {/* Left: Menu Icon (fixed width) */}
-        <View style={{ width: 88, justifyContent: 'flex-start', alignItems: 'flex-start', zIndex: 2 }}>
-          <TouchableOpacity
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              if (typeof setIsMenuVisible === 'function') setIsMenuVisible(true);
-            }}
-            style={{ padding: 6 }}
-          >
-            <MaterialIcons name="menu" size={28} color="#f97316" />
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      header: () => (
+        <View style={{ flexDirection: 'row', alignItems: 'center', height: 72, backgroundColor: '#fff', paddingHorizontal: 8, borderBottomWidth: 0, elevation: 0, paddingTop: 22 }}>
+          {/* Menu Icon */}
+          <TouchableOpacity onPress={() => navigation.dispatch(DrawerActions.openDrawer())} style={{ marginLeft: 4, marginRight: 8, height: 40, justifyContent: 'center', alignItems: 'center' }}>
+            <CustomDrawerMenuIcon />
           </TouchableOpacity>
-        </View>
-        {/* Center: Title (absolutely centered) */}
-        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', pointerEvents: 'none', zIndex: 1 }}>
-          <Text className={`text-xl font-JakartaBold text-center`} style={{ textAlign: 'center' }}>
-            {t.Home}
-          </Text>
-        </View>
-        {/* Right: Notification + Profile (fixed width) */}
-        <View style={{ width: 88, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', zIndex: 2 }}>
+          {/* Title */}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' }}>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#222', textAlign: 'center', lineHeight: 28 }}>Home</Text>
+          </View>
+          {/* Notification Icon */}
           <TouchableOpacity
             onPress={() => router.push('/(root)/notifications')}
-            style={{ marginHorizontal: 4, padding: 6 }}
+            style={{ marginHorizontal: 4, padding: 6, height: 40, justifyContent: 'center', alignItems: 'center' }}
           >
-            <View>
-              <MaterialIcons name="notifications-none" size={28} color="#f97316" />
-              {unreadCount > 0 && (
-                <View style={{ position: 'absolute', top: -2, right: -2, backgroundColor: '#EF4444', borderRadius: 8, paddingHorizontal: 4, minWidth: 16, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{unreadCount}</Text>
-                </View>
-              )}
-            </View>
+            <MaterialIcons name="notifications-none" size={28} color="#f97316" />
+            {unreadCount > 0 && (
+              <View style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#EF4444', borderRadius: 8, paddingHorizontal: 4, minWidth: 16, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{unreadCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
+          {/* Profile Icon */}
           <TouchableOpacity
             onPress={() => router.push('/(root)/profilePage')}
             style={{
@@ -223,8 +217,12 @@ export default function Home() {
             )}
           </TouchableOpacity>
         </View>
-      </View>
+      ),
+    });
+  }, [navigation, unreadCount, profileImageUrl]);
 
+  return (
+    <SafeAreaView className="bg-general-500 flex-1">
       {/* Content with Barrier Section below Header */}
       <FlatList 
         data={[]}
@@ -355,7 +353,7 @@ export default function Home() {
                 </TouchableOpacity>
               </View>
             </View>
-            <SuggestedRides key={refreshKey} refreshKey={refreshKey} />
+            <SuggestedRides />
           </>
         }
         refreshControl={
@@ -389,8 +387,6 @@ export default function Home() {
           <MaterialIcons name="add" size={30} color="#fff" />
         </TouchableOpacity>
       )}
-
-     
 
       <StatusBar backgroundColor="#F87000" style="dark" />
     </SafeAreaView>
