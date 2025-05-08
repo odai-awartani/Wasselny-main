@@ -142,7 +142,7 @@ export default function SideMenu(props: DrawerContentComponentProps) {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={toggleLocation}
+          onPress={() => router.push('/(root)/location')}
           activeOpacity={0.7}
           className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
         >

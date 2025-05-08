@@ -1,147 +1,120 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useLanguage } from '@/context/LanguageContext';
+import { useUser } from '@clerk/clerk-expo';
 import * as Haptics from 'expo-haptics';
-
-interface FAQItem {
-  question: string;
-  answer: string;
-}
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function Help() {
   const router = useRouter();
   const { language } = useLanguage();
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const { user } = useUser();
+  const [message, setMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
 
-  const faqs: FAQItem[] = language === 'ar' ? [
-    {
-      question: 'كيف يمكنني إنشاء رحلة جديدة؟',
-      answer: 'يمكنك إنشاء رحلة جديدة من خلال الضغط على زر "رحلة جديدة" في الصفحة الرئيسية واتباع الخطوات المطلوبة.'
-    },
-    {
-      question: 'كيف يمكنني تعديل معلومات حسابي؟',
-      answer: 'يمكنك تعديل معلومات حسابك من خلال الذهاب إلى صفحة الملف الشخصي والضغط على زر التعديل.'
-    },
-    {
-      question: 'كيف يمكنني التواصل مع الدعم الفني؟',
-      answer: 'يمكنك التواصل مع فريق الدعم الفني من خلال البريد الإلكتروني أو رقم الهاتف الموجود في هذه الصفحة.'
+  const handleSendMessage = async () => {
+    if (!message.trim()) {
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        language === 'ar' ? 'الرجاء إدخال رسالة' : 'Please enter a message'
+      );
+      return;
     }
-  ] : [
-    {
-      question: 'How do I create a new ride?',
-      answer: 'You can create a new ride by pressing the "New Ride" button on the home page and following the required steps.'
-    },
-    {
-      question: 'How can I modify my account information?',
-      answer: 'You can modify your account information by going to the profile page and pressing the edit button.'
-    },
-    {
-      question: 'How can I contact technical support?',
-      answer: 'You can contact our technical support team through the email or phone number listed on this page.'
+
+    setIsSending(true);
+    try {
+      await addDoc(collection(db, 'support_messages'), {
+        userId: user?.id,
+        userName: user?.fullName,
+        userEmail: user?.primaryEmailAddress?.emailAddress,
+        message: message.trim(),
+        createdAt: serverTimestamp(),
+        status: 'pending'
+      });
+
+      Alert.alert(
+        language === 'ar' ? 'نجاح' : 'Success',
+        language === 'ar' ? 'تم إرسال رسالتك بنجاح' : 'Your message has been sent successfully'
+      );
+      setMessage('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        language === 'ar' ? 'حدث خطأ أثناء إرسال الرسالة' : 'Error sending message'
+      );
+    } finally {
+      setIsSending(false);
     }
-  ];
-
-  const handleEmailPress = () => {
-    Linking.openURL('mailto:wasselny@gmail.com');
-  };
-
-  const handlePhonePress = () => {
-    Linking.openURL('tel:+0592744930');
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      {/* Header */}
-      <View className="flex-row items-center px-4 py-3 border-b border-gray-100">
-        <TouchableOpacity
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.back();
-          }}
-          className="w-10 h-10 items-center justify-center rounded-full bg-gray-100"
-        >
-          <MaterialIcons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text className={`text-xl flex-1 text-center ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-800`}>
-          {language === 'ar' ? 'المساعدة والدعم' : 'Help & Support'}
-        </Text>
-        <View className="w-10" />
-      </View>
-
       {/* Content */}
-      <ScrollView className="flex-1 px-4 py-6">
-        {/* FAQs */}
-        <Text className={`text-lg ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-800 mb-4`}>
-          {language === 'ar' ? 'الأسئلة الشائعة' : 'Frequently Asked Questions'}
-        </Text>
-        
-        {faqs.map((faq, index) => (
-          <TouchableOpacity
-            key={index}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setExpandedIndex(expandedIndex === index ? null : index);
-            }}
-            className="bg-gray-50 rounded-xl p-4 mb-3"
-          >
-            <View className="flex-row justify-between items-center">
-              <Text className={`flex-1 ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-800`}>
-                {faq.question}
-              </Text>
-              <MaterialIcons
-                name={expandedIndex === index ? "expand-less" : "expand-more"}
-                size={24}
-                color="#666"
-              />
-            </View>
-            {expandedIndex === index && (
-              <Text className={`mt-2 ${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaRegular'} text-gray-600`}>
-                {faq.answer}
-              </Text>
-            )}
-          </TouchableOpacity>
-        ))}
+      <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
+        {/* User Info */}
+        <View>
+          <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+            {language === 'ar' ? 'الاسم الكامل' : 'Full Name'}
+          </Text>
+          <View className="bg-white py-3 px-3 border border-gray-200 rounded-md">
+            <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              {user?.fullName || (language === 'ar' ? 'غير محدد' : 'Not specified')}
+            </Text>
+          </View>
+        </View>
 
-        {/* Contact Section */}
-        <Text className={`text-lg ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-800 mt-6 mb-4`}>
-          {language === 'ar' ? 'تواصل معنا' : 'Contact Us'}
-        </Text>
+        {/* Email */}
+        <View className="mt-4">
+          <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+            {language === 'ar' ? 'البريد الإلكتروني' : 'Email Address'}
+          </Text>
+          <View className="bg-white py-3 px-3 border border-gray-200 rounded-md">
+            <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              {user?.primaryEmailAddress?.emailAddress || (language === 'ar' ? 'غير محدد' : 'Not specified')}
+            </Text>
+          </View>
+        </View>
 
+        {/* Message Input */}
+        <View className="mt-4">
+          <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+            {language === 'ar' ? 'الرسالة' : 'Message'}
+          </Text>
+          <View className="bg-white border border-gray-200 rounded-md overflow-hidden">
+            <TextInput
+              value={message}
+              onChangeText={setMessage}
+              multiline
+              numberOfLines={6}
+              placeholder={language === 'ar' ? 'اكتب رسالتك هنا...' : 'Write your message here...'}
+              placeholderTextColor="#9CA3AF"
+              className={`py-3 px-3 text-[15px] ${language === 'ar' ? 'text-right' : 'text-left'}`}
+              style={{
+                textAlignVertical: 'top',
+                minHeight: 120,
+                fontFamily: language === 'ar' ? 'Cairo-Regular' : 'PlusJakartaSans-Regular'
+              }}
+            />
+          </View>
+        </View>
+
+        {/* Send Button */}
         <TouchableOpacity
-          onPress={handleEmailPress}
-          className="flex-row items-center bg-gray-50 rounded-xl p-4 mb-3"
+          onPress={handleSendMessage}
+          disabled={isSending}
+          className={`bg-orange-500 py-3 px-4 rounded-md mt-4 ${isSending ? 'opacity-50' : ''}`}
         >
-          <View className="w-10 h-10 rounded-full bg-orange-50 items-center justify-center">
-            <MaterialIcons name="email" size={24} color="#f97316" />
-          </View>
-          <View className="ml-3">
-            <Text className={`${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-800`}>
-              {language === 'ar' ? 'البريد الإلكتروني' : 'Email'}
-            </Text>
-            <Text className={`${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaRegular'} text-gray-600`}>
-              support@wasselny.com
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={handlePhonePress}
-          className="flex-row items-center bg-gray-50 rounded-xl p-4"
-        >
-          <View className="w-10 h-10 rounded-full bg-orange-50 items-center justify-center">
-            <MaterialIcons name="phone" size={24} color="#f97316" />
-          </View>
-          <View className="ml-3">
-            <Text className={`${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-800`}>
-              {language === 'ar' ? 'رقم الهاتف' : 'Phone'}
-            </Text>
-            <Text className={`${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaRegular'} text-gray-600`}>
-              +1234567890
-            </Text>
-          </View>
+          <Text className={`text-white text-center text-[15px] ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
+            {isSending 
+              ? (language === 'ar' ? 'جاري الإرسال...' : 'Sending...')
+              : (language === 'ar' ? 'إرسال الرسالة' : 'Send Message')
+            }
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

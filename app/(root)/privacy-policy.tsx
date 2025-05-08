@@ -12,41 +12,24 @@ export default function PrivacyPolicy() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      {/* Header */}
-      <View className="flex-row items-center px-4 py-3 border-b border-gray-100">
-        <TouchableOpacity
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.back();
-          }}
-          className="w-10 h-10 items-center justify-center rounded-full bg-gray-100"
-        >
-          <MaterialIcons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text className={`text-xl flex-1 text-center ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-800`}>
-          {language === 'ar' ? 'سياسة الخصوصية' : 'Privacy Policy'}
-        </Text>
-        <View className="w-10" />
-      </View>
-
       {/* Content */}
       <ScrollView className="flex-1 px-4 py-6">
-        <Text className={`text-base ${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaRegular'} text-gray-700 leading-6`}>
+        <Text className={`text-base ${language === 'ar' ? 'font-CairoRegular text-right' : 'font-JakartaRegular text-left'} text-gray-700 leading-6`}>
           {language === 'ar' ? (
             <>
-              مرحباً بك في سياسة الخصوصية لتطبيق وسيلني. نحن نقدر خصوصيتك ونلتزم بحماية بياناتك الشخصية.
+              مرحباً بك في سياسة الخصوصية لتطبيق وصلني. نحن نقدر خصوصيتك ونلتزم بحماية بياناتك الشخصية.
 
               {'\n\n'}1. جمع المعلومات
               {'\n'}نقوم بجمع المعلومات الضرورية لتقديم خدماتنا، بما في ذلك:
-              • معلومات الموقع
-              • معلومات الحساب
-              • معلومات الاتصال
+              {'\n'}• معلومات الموقع
+              {'\n'}• معلومات الحساب
+              {'\n'}• معلومات الاتصال
 
               {'\n\n'}2. استخدام المعلومات
               {'\n'}نستخدم معلوماتك لـ:
-              • تقديم خدمات التطبيق
-              • تحسين تجربة المستخدم
-              • التواصل معك
+              {'\n'}• تقديم خدمات التطبيق
+              {'\n'}• تحسين تجربة المستخدم
+              {'\n'}• التواصل معك
 
               {'\n\n'}3. حماية المعلومات
               {'\n'}نحن نستخدم تقنيات تشفير متقدمة لحماية بياناتك الشخصية.
@@ -56,9 +39,9 @@ export default function PrivacyPolicy() {
 
               {'\n\n'}5. حقوق المستخدم
               {'\n'}يمكنك في أي وقت:
-              • الوصول إلى بياناتك
-              • تعديل معلوماتك
-              • حذف حسابك
+              {'\n'}• الوصول إلى بياناتك
+              {'\n'}• تعديل معلوماتك
+              {'\n'}• حذف حسابك
             </>
           ) : (
             <>
@@ -66,15 +49,15 @@ export default function PrivacyPolicy() {
 
               {'\n\n'}1. Information Collection
               {'\n'}We collect necessary information to provide our services, including:
-              • Location information
-              • Account information
-              • Contact information
+              {'\n'}• Location information
+              {'\n'}• Account information
+              {'\n'}• Contact information
 
               {'\n\n'}2. Information Usage
               {'\n'}We use your information to:
-              • Provide app services
-              • Improve user experience
-              • Communicate with you
+              {'\n'}• Provide app services
+              {'\n'}• Improve user experience
+              {'\n'}• Communicate with you
 
               {'\n\n'}3. Information Protection
               {'\n'}We use advanced encryption technologies to protect your personal data.
@@ -84,9 +67,9 @@ export default function PrivacyPolicy() {
 
               {'\n\n'}5. User Rights
               {'\n'}You can at any time:
-              • Access your data
-              • Modify your information
-              • Delete your account
+              {'\n'}• Access your data
+              {'\n'}• Modify your information
+              {'\n'}• Delete your account
             </>
           )}
         </Text>

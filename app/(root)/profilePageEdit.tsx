@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { useUser, useAuth } from "@clerk/clerk-expo";
-import { Image, ScrollView, Text, View, TouchableOpacity, Alert, ActivityIndicator, RefreshControl, Modal, TextInput } from "react-native";
+import { Image, ScrollView, Text, View, TouchableOpacity, Alert, ActivityIndicator, RefreshControl, Modal, TextInput, Switch, Share, Platform, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLanguage } from '@/context/LanguageContext';
 import { AntDesign, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from "expo-router";
+import { useRouter, Stack } from "expo-router";
 import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { uploadImageToCloudinary } from "@/lib/upload";
 import * as ImagePicker from "expo-image-picker";
 import uploadIcon from '@/assets/icons/upload.png';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import * as Notifications from 'expo-notifications';
 
 interface UserData {
   driver?: {
@@ -56,6 +57,8 @@ const ProfileEdit = () => {
     carSeats: '',
     phoneNumber: '',
   });
+
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   const phoneNumber = user?.unsafeMetadata?.phoneNumber as string || "+972342423423";
 
@@ -130,6 +133,89 @@ const ProfileEdit = () => {
       isMounted = false;
     };
   }, [user?.id, user?.imageUrl]);
+
+  useEffect(() => {
+    checkNotificationPermission();
+  }, []);
+
+  const checkNotificationPermission = async () => {
+    try {
+      const { status } = await Notifications.getPermissionsAsync();
+      setNotificationsEnabled(status === 'granted');
+    } catch (error) {
+      console.log('Error checking notification permission:', error);
+    }
+  };
+
+  const toggleNotifications = async () => {
+    try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      
+      if (existingStatus === 'granted') {
+        // If notifications are already enabled, show turn off confirmation
+        Alert.alert(
+          language === 'ar' ? 'تعطيل الإشعارات' : 'Disable Notifications',
+          language === 'ar' 
+            ? 'هل أنت متأكد أنك تريد تعطيل الإشعارات؟' 
+            : 'Are you sure you want to disable notifications?',
+          [
+            {
+              text: language === 'ar' ? 'إلغاء' : 'Cancel',
+              style: 'cancel',
+            },
+            {
+              text: language === 'ar' ? 'تعطيل' : 'Disable',
+              onPress: () => {
+                setNotificationsEnabled(false);
+                // Open app settings to let user disable notifications
+                Linking.openSettings();
+              },
+              style: 'destructive',
+            },
+          ]
+        );
+      } else {
+        // If notifications are disabled, show enable prompt
+        Alert.alert(
+          language === 'ar' ? 'تفعيل الإشعارات' : 'Enable Notifications',
+          language === 'ar' 
+            ? 'هل تريد تلقي إشعارات لتتبع رحلاتك وتحديثاتها؟' 
+            : 'Would you like to receive notifications to track your rides and updates?',
+          [
+            {
+              text: language === 'ar' ? 'لا تسمح' : "Don't Allow",
+              style: 'cancel',
+            },
+            {
+              text: language === 'ar' ? 'السماح' : 'Allow',
+              onPress: async () => {
+                const { status } = await Notifications.requestPermissionsAsync();
+                if (status === 'granted') {
+                  setNotificationsEnabled(true);
+                  // Register for push notifications here
+                  const token = await Notifications.getExpoPushTokenAsync({
+                    projectId: 'your-project-id' // Replace with your Expo project ID
+                  });
+                  console.log('Expo push token:', token);
+                  // Here you would typically send this token to your backend
+                } else {
+                  setNotificationsEnabled(false);
+                }
+              },
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      console.log('Error toggling notifications:', error);
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        language === 'ar' 
+          ? 'حدث خطأ أثناء تحديث إعدادات الإشعارات' 
+          : 'There was an error updating notification settings'
+      );
+    }
+  };
 
   const handleEditField = async (field: string) => {
     if (!user?.id) return;
@@ -284,241 +370,238 @@ const ProfileEdit = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      {/* Header */}
-      <View className={`px-5 py-4 flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : ''} justify-between border-b border-gray-200`}>
-        <TouchableOpacity onPress={() => router.back()} className="p-2">
-          <MaterialIcons 
-            name={language === 'ar' ? "chevron-right" : "chevron-left"} 
-            size={24} 
-            color="#374151"
-          />
-        </TouchableOpacity>
-        <Text className="text-lg font-bold text-gray-800">
-          {language === 'ar' ? 'تعديل الملف' : 'Profile Edit'}
-        </Text>
-        <View style={{ width: 40 }} /> {/* Empty view for balanced spacing */}
-      </View>
-
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={() => {
-              setIsRefreshing(true);
-              fetchUserData().finally(() => setIsRefreshing(false));
-            }}
-            colors={["#F97316"]}
-            tintColor="#F97316"
-          />
-        }
-        className="px-5"
-        contentContainerStyle={{ paddingBottom: 120 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Profile Header */}
-        <View className="mt-6 mb-4">
-          <View className="flex-row justify-between px-2">
-            {/* Profile Picture Box */}
+    <>
+      <Stack.Screen 
+        options={{
+          headerTitle: language === 'ar' ? 'تعديل الملف' : 'Profile Edit',
+          headerTitleStyle: {
+            fontSize: 18,
+            fontFamily: language === 'ar' ? 'Cairo-Bold' : 'PlusJakartaSans-Bold',
+          },
+          headerTitleAlign: 'center',
+        }} 
+      />
+      <SafeAreaView className="flex-1 bg-white">
+        <ScrollView
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={() => {
+                setIsRefreshing(true);
+                fetchUserData().finally(() => setIsRefreshing(false));
+              }}
+              colors={["#F97316"]}
+              tintColor="#F97316"
+            />
+          }
+          className="flex-1"
+          contentContainerStyle={{ padding: 16 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Profile Images */}
+          <View className="flex-row justify-between">
             <View className="w-[48%]">
               <TouchableOpacity 
                 onPress={() => setShowFullImage(true)} 
-                className="bg-snow rounded-xl p-3 items-center border border-gray-200"
+                className="bg-white rounded-2xl overflow-hidden"
               >
-                {userData.profileImage || user?.imageUrl ? (
-                  <Image
-                    source={{ uri: userData.profileImage || user?.imageUrl }}
-                    className="w-32 h-32 rounded-lg"
-                    resizeMode="cover"
-                  />
-                ) : null}
-                {isUploading && (
-                  <View className="absolute inset-0 bg-black/50 rounded-lg items-center justify-center">
-                    <ActivityIndicator color="white" />
-                  </View>
-                )}
+                <Image
+                  source={{ uri: userData.profileImage || user?.imageUrl }}
+                  className="w-full aspect-square"
+                  resizeMode="cover"
+                />
                 <TouchableOpacity
                   onPress={handleImagePick}
-                  className="absolute bottom-1 right-1 rounded-full p-2"
+                  className="absolute bottom-2 right-2 bg-white rounded-full p-1.5"
                 >
-                  <Image source={uploadIcon} style={{ width: 24, height: 24 }} />
+                  <Image 
+                    source={uploadIcon} 
+                    style={{ width: 20, height: 20 }} 
+                    resizeMode="contain"
+                  />
                 </TouchableOpacity>
               </TouchableOpacity>
             </View>
 
-            {/* Car Photo Box - Only show if user is a driver */}
-            {userData.isDriver && userData.data?.driver?.car_image_url && (
+            {userData.isDriver && (
               <View className="w-[48%]">
                 <TouchableOpacity 
                   onPress={() => setShowFullCarImage(true)} 
-                  className="bg-snow rounded-xl p-3 items-center border border-gray-200"
+                  className="bg-white rounded-2xl overflow-hidden"
                 >
                   <Image
-                    source={{ uri: userData.data.driver.car_image_url }}
-                    className="w-32 h-32 rounded-lg"
+                    source={{ uri: userData.data?.driver?.car_image_url }}
+                    className="w-full aspect-square"
                     resizeMode="cover"
                   />
                   <TouchableOpacity
                     onPress={handleCarImagePick}
-                    className="absolute bottom-1 right-1 rounded-full p-2"
+                    className="absolute bottom-2 right-2 bg-white rounded-full p-1.5"
                   >
-                    <Image source={uploadIcon} style={{ width: 24, height: 24 }} />
+                    <Image 
+                      source={uploadIcon} 
+                      style={{ width: 20, height: 20 }} 
+                      resizeMode="contain"
+                    />
                   </TouchableOpacity>
                 </TouchableOpacity>
               </View>
             )}
           </View>
 
-          <View className="mt-4">
-            {/* Name Field */}
-            <View className="mb-4">
-              <Text className={`text-gray-500 text-sm mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+          {/* Form Fields */}
+          <View className="mt-8 space-y-6">
+            {/* Full Name */}
+            <View>
+              <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                 {language === 'ar' ? 'الاسم الكامل' : 'Full Name'}
               </Text>
-              <View className={`bg-snow rounded-lg p-3 flex-row items-center justify-between border border-gray-200 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                <Text className={`text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              <View className="bg-white py-3 px-3 border border-gray-200 rounded-md">
+                <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {user?.fullName || (language === 'ar' ? 'غير محدد' : 'Not specified')}
                 </Text>
               </View>
             </View>
 
-            {/* Email Field */}
-            <View className="mb-4">
-              <Text className={`text-gray-500 text-sm mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+            {/* Email */}
+            <View>
+              <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                 {language === 'ar' ? 'البريد الإلكتروني' : 'Email Address'}
               </Text>
-              <View className={`bg-snow rounded-lg p-3 flex-row items-center justify-between border border-gray-200 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                <Text className={`text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              <View className="bg-white py-3 px-3 border border-gray-200 rounded-md">
+                <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {user?.primaryEmailAddress?.emailAddress || (language === 'ar' ? 'غير محدد' : 'Not specified')}
                 </Text>
               </View>
             </View>
-          </View>
-        </View>
 
-        {/* Editable Fields */}
-        {userData.isDriver && (
-          <>
-            {/* Car Type */}
-            <View className="mb-4">
-              <Text className={`text-gray-500 text-sm mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                {language === 'ar' ? 'نوع السيارة' : 'Car Type'}
-              </Text>
-              <View className={`bg-snow rounded-lg p-3 flex-row items-center justify-between border border-gray-200 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                {editingField === 'carType' ? (
-                  <TextInput
-                    value={editValues.carType}
-                    onChangeText={(text) => setEditValues(prev => ({ ...prev, carType: text }))}
-                    className={`flex-1 text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}
-                    autoFocus
-                    placeholder={language === 'ar' ? 'أدخل نوع السيارة' : 'Enter car type'}
-                    textAlign={language === 'ar' ? 'right' : 'left'}
-                  />
-                ) : (
-                  <Text className={`text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+            {/* Car Type - Only for drivers */}
+            {userData.isDriver && (
+              <View>
+                <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'نوع السيارة' : 'Car Type'}
+                </Text>
+                <View className={`bg-white py-3 px-3 border border-gray-200 rounded-md flex-row justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                  <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                     {userData.data?.driver?.car_type || (language === 'ar' ? 'غير محدد' : 'Not specified')}
                   </Text>
-                )}
-                <TouchableOpacity
-                  onPress={() => {
-                    if (editingField === 'carType') {
-                      handleEditField('carType');
-                    } else {
-                      setEditingField('carType');
-                    }
-                  }}
-                >
-                  {editingField === 'carType' ? (
-                    <AntDesign name="check" size={18} color="#f97316" />
-                  ) : (
-                    <MaterialIcons name="edit" size={18} color="#f97316" />
-                  )}
-                </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setEditingField('carType')}>
+                    <MaterialIcons name="edit" size={20} color="#F97316" />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-
-            {/* Car Seats */}
-            <View className="mb-4">
-              <Text className={`text-gray-500 text-sm mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                {language === 'ar' ? 'عدد المقاعد' : 'Car Seats'}
-              </Text>
-              <View className={`bg-snow rounded-lg p-3 flex-row items-center justify-between border border-gray-200 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                {editingField === 'carSeats' ? (
-                  <TextInput
-                    value={editValues.carSeats}
-                    onChangeText={(text) => setEditValues(prev => ({ ...prev, carSeats: text }))}
-                    className={`flex-1 text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}
-                    keyboardType="numeric"
-                    autoFocus
-                    placeholder={language === 'ar' ? 'أدخل عدد المقاعد' : 'Enter number of seats'}
-                    textAlign={language === 'ar' ? 'right' : 'left'}
-                  />
-                ) : (
-                  <Text className={`text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                    {userData.data?.driver?.car_seats || 0}
-                  </Text>
-                )}
-                <TouchableOpacity
-                  onPress={() => {
-                    if (editingField === 'carSeats') {
-                      handleEditField('carSeats');
-                    } else {
-                      setEditingField('carSeats');
-                    }
-                  }}
-                >
-                  {editingField === 'carSeats' ? (
-                    <AntDesign name="check" size={18} color="#f97316" />
-                  ) : (
-                    <MaterialIcons name="edit" size={18} color="#f97316" />
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </>
-        )}
-
-        {/* Phone Number */}
-        <View className="mb-4">
-          <Text className={`text-gray-500 text-sm mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-            {language === 'ar' ? 'رقم الهاتف' : 'Phone Number'}
-          </Text>
-          <View className={`bg-snow rounded-lg p-3 flex-row items-center justify-between border border-gray-200 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-            {editingField === 'phoneNumber' ? (
-              <TextInput
-                value={editValues.phoneNumber}
-                onChangeText={(text) => setEditValues(prev => ({ ...prev, phoneNumber: text }))}
-                className={`flex-1 text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}
-                keyboardType="phone-pad"
-                autoFocus
-                placeholder={language === 'ar' ? 'أدخل رقم الهاتف' : 'Enter phone number'}
-                textAlign={language === 'ar' ? 'right' : 'left'}
-              />
-            ) : (
-              <Text className={`text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                {phoneNumber}
-              </Text>
             )}
+
+            {/* Car Seats - Only for drivers */}
+            {userData.isDriver && (
+              <View>
+                <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'عدد المقاعد' : 'Car Seats'}
+                </Text>
+                <View className={`bg-white py-3 px-3 border border-gray-200 rounded-md flex-row justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                  <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                    {userData.data?.driver?.car_seats || '0'}
+                  </Text>
+                  <TouchableOpacity onPress={() => setEditingField('carSeats')}>
+                    <MaterialIcons name="edit" size={20} color="#F97316" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Phone Number */}
+            <View>
+              <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'رقم الهاتف' : 'Phone Number'}
+              </Text>
+              <View className={`bg-white py-3 px-3 border border-gray-200 rounded-md flex-row justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {phoneNumber}
+                </Text>
+                <TouchableOpacity onPress={() => setEditingField('phoneNumber')}>
+                  <MaterialIcons name="edit" size={20} color="#F97316" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Notifications */}
             <TouchableOpacity
-              onPress={() => {
-                if (editingField === 'phoneNumber') {
-                  handleEditField('phoneNumber');
-                } else {
-                  setEditingField('phoneNumber');
-                }
-              }}
+              onPress={toggleNotifications}
+              activeOpacity={0.7}
+              className={`flex-row items-center mb-3 min-h-[44px] ${language === 'ar' ? 'flex-row-reverse' : ''}`}
             >
-              {editingField === 'phoneNumber' ? (
-                <AntDesign name="check" size={18} color="#f97316" />
-              ) : (
-                <MaterialIcons name="edit" size={18} color="#f97316" />
-              )}
+              <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${language === 'ar' ? 'ml-3.5' : 'mr-3.5'}`}>
+                <MaterialIcons name="notifications" size={22} color="#fff" />
+              </View>
+              <View className={`flex-1 flex-row items-center ${language === 'ar' ? 'flex-row-reverse justify-between' : 'justify-between'}`}>
+                <Text className={`text-base font-bold text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'الإشعارات' : 'Notifications'}
+                </Text>
+                <Switch
+                  value={notificationsEnabled}
+                  onValueChange={toggleNotifications}
+                  trackColor={{ false: '#d1d5db', true: '#f97316' }}
+                  thumbColor="#fff"
+                />
+              </View>
             </TouchableOpacity>
           </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+
+        {/* Edit Field Modal */}
+        <Modal
+          visible={!!editingField}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setEditingField(null)}
+        >
+          <View className="flex-1 bg-black/50 justify-center items-center px-5">
+            <View className="bg-white w-full rounded-xl p-4">
+              <TextInput
+                value={editValues[editingField as keyof typeof editValues]}
+                onChangeText={(text) => setEditValues(prev => ({ ...prev, [editingField as string]: text }))}
+                className="border border-gray-200 rounded-xl p-3.5 mb-4 text-[15px]"
+                placeholder={language === 'ar' ? getArabicPlaceholder(editingField) : `Enter ${editingField}`}
+                keyboardType={editingField === 'carSeats' || editingField === 'phoneNumber' ? 'numeric' : 'default'}
+                textAlign={language === 'ar' ? 'right' : 'left'}
+                style={{
+                  fontFamily: language === 'ar' ? 'Cairo-Regular' : 'PlusJakartaSans-Regular'
+                }}
+              />
+              <View className={`flex-row justify-end space-x-3 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                <TouchableOpacity
+                  onPress={() => setEditingField(null)}
+                  className="px-4 py-2"
+                >
+                  <Text className="text-gray-500 text-[15px]">{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleEditField(editingField as string)}
+                  className="bg-orange-500 px-4 py-2 rounded-lg"
+                >
+                  <Text className="text-white text-[15px]">{language === 'ar' ? 'حفظ' : 'Save'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </SafeAreaView>
+    </>
   );
+};
+
+// Helper function for Arabic placeholders
+const getArabicPlaceholder = (field: string | null) => {
+  switch (field) {
+    case 'carType':
+      return 'أدخل نوع السيارة';
+    case 'carSeats':
+      return 'أدخل عدد المقاعد';
+    case 'phoneNumber':
+      return 'أدخل رقم الهاتف';
+    default:
+      return '';
+  }
 };
 
 export default ProfileEdit;
