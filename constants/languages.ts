@@ -40,7 +40,7 @@ export const translations = {
     enterVerificationCode: "أدخل رمز التحقق",
     verifyEmailHint: "تحقق من بريدك الإلكتروني",
     navigateToHomeHint: "انتقل إلى الصفحة الرئيسية",
-    loading: "جاري التحميل...", // Arabic for loading
+    loading: "جاري التحميل...",
     cancel: "إلغاء",
     genders: ['ذكر', 'أنثى'],
     industries: [
@@ -96,7 +96,7 @@ export const translations = {
     barriers: "حواجز الصمود",
     barriersDescription: "تعرف على تأثير الحواجز في فلسطين",
     explore: "استكشف",
-    userName: "المستخدم",
+    user: "المستخدم",
     newRide: "رحلة جديدة",
     suggestedRides: "رحلات مقترحة",
     createRide: "إنشاء رحلة",
@@ -205,8 +205,17 @@ export const translations = {
     Qalqilya: 'قلقيلية',
     Salfit: 'سلفيت',
     Tubas: 'طوباس',
-    
-    
+    editProfile: "تعديل الملف الشخصي",
+    language: "اللغة",
+    notifications: "الإشعارات",
+    location: "الموقع",
+    support: "الدعم",
+    shareApp: "مشاركة التطبيق",
+    shareAppMessage: "تحقق من تطبيق وسيلني - تطبيق مشاركة الرحلات!",
+    rateUs: "قيم التطبيق",
+    privacyPolicy: "سياسة الخصوصية",
+    helpAndSupport: "المساعدة والدعم",
+    account: "الحساب"
   },
   en: {
     chooseLanguage: "Choose Language",
@@ -296,7 +305,7 @@ export const translations = {
     barriers: "Barriers",
     barriersDescription: "Learn about the impact of checkpoints in Palestine",
     explore: "Explore",
-    userName: "User",
+    user: "User",
     newRide: "New Ride",
     suggestedRides: "Suggested Rides",
     createRide: "Create Ride",
@@ -404,5 +413,16 @@ export const translations = {
     january: "January",
     february: "February",
     march: "March",
-  },
+    editProfile: "Edit Profile",
+    language: "Language",
+    notifications: "Notifications",
+    location: "Location",
+    support: "Support",
+    shareApp: "Share App",
+    shareAppMessage: "Check out Wasselny - Your Carpooling App!",
+    rateUs: "Rate Us",
+    privacyPolicy: "Privacy Policy",
+    helpAndSupport: "Help & Support",
+    account: "Account"
+  }
 };

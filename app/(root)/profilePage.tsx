@@ -6,7 +6,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { icons } from '@/constants';
 import { AntDesign, MaterialCommunityIcons, Ionicons, FontAwesome5, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
-import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc, query, getDocs, collection, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import * as ImagePicker from "expo-image-picker";
 import { uploadImageToCloudinary } from "@/lib/upload";
@@ -20,9 +20,27 @@ interface UserData {
     car_image_url: string;
     profile_image_url: string;
     created_at: string;
+    rating?: number;
+    total_rides?: number;
   };
   profile_image_url?: string;
   role?: string;
+}
+
+interface DetailedRating {
+  overall: number;
+  driving: number;
+  behavior: number;
+  punctuality: number;
+  cleanliness: number;
+  comment?: string;
+  passenger_name: string;
+  created_at: any;
+  ride_details: {
+    origin_address: string;
+    destination_address: string;
+    ride_datetime: string;
+  };
 }
 
 const Profile = () => {
@@ -32,6 +50,9 @@ const Profile = () => {
   const router = useRouter();
   const t = translations[language];
   
+  // Add state for pending applications count
+  const [pendingApplicationsCount, setPendingApplicationsCount] = useState(0);
+
   // Add missing variables
   const totalRides = 24;
   const rating = 4.8;
@@ -53,13 +74,16 @@ const Profile = () => {
   
   const [isUploading, setIsUploading] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
-  const [showFullCarImage, setShowFullCarImage] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [expandedCards, setExpandedCards] = useState({
-    driverInfo: true,
+    driverInfo: false,
     carImage: false,
-    accountInfo: false
+    accountInfo: false,
+    ratings: true
   });
+
+  const [ratings, setRatings] = useState<DetailedRating[]>([]);
+  const [showRatings, setShowRatings] = useState(false);
 
   const phoneNumber = user?.unsafeMetadata?.phoneNumber as string || "+1 123-456-7890";
 
@@ -94,16 +118,40 @@ const Profile = () => {
 
       if (userDoc.exists()) {
         const data = userDoc.data() as UserData;
-        console.log('User Data:', data); // Debug log
-        console.log('Is Admin:', data.role === 'admin'); // Debug log
         
-        setUserData({
-          isDriver: !!data.driver?.is_active,
-          isLoading: false,
-          profileImage: data.driver?.profile_image_url || user?.imageUrl || null,
-          data,
-          isAdmin: data.role === 'admin'
-        });
+        // Fetch detailed ratings if user is a driver
+        if (data.driver?.is_active) {
+          const ratingsQuery = query(
+            collection(db, 'ratings'),
+            where('driver_id', '==', user.id)
+          );
+          
+          const ratingsSnapshot = await getDocs(ratingsQuery);
+          const ratingsData = ratingsSnapshot.docs.map(doc => ({
+            ...doc.data()
+          })) as DetailedRating[];
+          
+          if (isMounted) {
+            setRatings(ratingsData);
+
+            // Calculate average rating
+            if (ratingsData.length > 0) {
+              const avgRating = ratingsData.reduce((acc, curr) => acc + curr.overall, 0) / ratingsData.length;
+              data.driver.rating = avgRating;
+              data.driver.total_rides = ratingsData.length;
+            }
+          }
+        }
+
+        if (isMounted) {
+          setUserData({
+            isDriver: !!data.driver?.is_active,
+            isLoading: false,
+            profileImage: data.driver?.profile_image_url || user?.imageUrl || null,
+            data,
+            isAdmin: data.role === 'admin'
+          });
+        }
       } else {
         console.log('User document does not exist'); // Debug log
         setUserData(prev => ({
@@ -135,16 +183,51 @@ const Profile = () => {
     setIsRefreshing(false);
   };
 
-  // Use a single effect to manage user data fetching
+  // Update function to fetch pending applications count with real-time updates
+  const fetchPendingApplicationsCount = async () => {
+    if (!userData.isAdmin) return;
+    
+    try {
+      const usersQuery = query(
+        collection(db, 'users'),
+        where('driver.status', '==', 'pending')
+      );
+      
+      // Set up real-time listener
+      const unsubscribe = onSnapshot(usersQuery, (snapshot) => {
+        setPendingApplicationsCount(snapshot.size);
+      }, (error) => {
+        console.error('Error in pending applications listener:', error);
+      });
+
+      // Return cleanup function
+      return unsubscribe;
+    } catch (error) {
+      console.error('Error setting up pending applications listener:', error);
+    }
+  };
+
+  // Update useEffect to handle real-time updates
   useEffect(() => {
     let isMounted = true;
-    fetchUserData(isMounted);
+    let unsubscribe: (() => void) | undefined;
+
+    const setupData = async () => {
+      await fetchUserData(isMounted);
+      if (userData.isAdmin) {
+        unsubscribe = await fetchPendingApplicationsCount();
+      }
+    };
+
+    setupData();
 
     return () => {
       isMounted = false;
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
-  }, [user?.id, user?.imageUrl]);
-
+  }, [user?.id, user?.imageUrl, userData.isAdmin]);
 
   const handleRegisterDriver = () => {
     router.push("/(root)/driverInfo");
@@ -261,6 +344,96 @@ const Profile = () => {
     }));
   };
 
+  const renderDetailedRatings = () => {
+    if (!userData.isDriver || ratings.length === 0) return null;
+
+    return (
+      <TouchableOpacity 
+        onPress={() => toggleCard('ratings')}
+        className="bg-white rounded-xl p-5 mt-4" 
+        style={Platform.OS === 'android' ? styles.androidShadow : styles.iosShadow}
+      >
+        <View className={`flex-row justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+          <Text className={`text-lg ${language === 'ar' ? 'font-Cairobold' : 'font-Jakartab'}`}>
+            {language === 'ar' ? 'التقييمات التفصيلية' : 'Detailed Ratings'}
+          </Text>
+          <AntDesign 
+            name={expandedCards.ratings ? 'up' : 'down'} 
+            size={20} 
+            color="#374151" 
+          />
+        </View>
+
+        {expandedCards.ratings && (
+          <View className="space-y-4 mt-4">
+            {ratings.map((rating, index) => (
+              <View key={index} className="bg-gray-50 p-4 rounded-xl">
+                <View className={`flex-row justify-between items-center mb-2 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                  <Text className={`text-sm ${language === 'ar' ? 'font-CairoRegular' : 'font-Jakartab'} text-gray-600`}>
+                    {rating.passenger_name}
+                  </Text>
+                  <View className="flex-row items-center">
+                    <Text className={`text-base ${language === 'ar' ? 'font-Cairobold' : 'font-Jakartab'} text-gray-900 ${language === 'ar' ? 'mr-1' : 'ml-1'}`}>
+                      {rating.overall.toFixed(1)}
+                    </Text>
+                    <Image source={icons.star} style={{ width: 16, height: 16 }} />
+                  </View>
+                </View>
+
+                <View className="space-y-2">
+                  <View className={`flex-row justify-between ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                    <Text className={`text-sm ${language === 'ar' ? 'font-CairoRegular' : 'font-Jakartab'} text-gray-600`}>
+                      {language === 'ar' ? 'قيادة السيارة' : 'Driving'}
+                    </Text>
+                    <Text className={`text-sm ${language === 'ar' ? 'font-Cairobold' : 'font-Jakartab'} text-gray-900`}>
+                      {rating.driving}
+                    </Text>
+                  </View>
+                  <View className={`flex-row justify-between ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                    <Text className={`text-sm ${language === 'ar' ? 'font-CairoRegular' : 'font-Jakartab'} text-gray-600`}>
+                      {language === 'ar' ? 'الأخلاق والسلوك' : 'Behavior'}
+                    </Text>
+                    <Text className={`text-sm ${language === 'ar' ? 'font-Cairobold' : 'font-Jakartab'} text-gray-900`}>
+                      {rating.behavior}
+                    </Text>
+                  </View>
+                  <View className={`flex-row justify-between ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                    <Text className={`text-sm ${language === 'ar' ? 'font-CairoRegular' : 'font-Jakartab'} text-gray-600`}>
+                      {language === 'ar' ? 'الالتزام بالمواعيد' : 'Punctuality'}
+                    </Text>
+                    <Text className={`text-sm ${language === 'ar' ? 'font-Cairobold' : 'font-Jakartab'} text-gray-900`}>
+                      {rating.punctuality}
+                    </Text>
+                  </View>
+                  <View className={`flex-row justify-between ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                    <Text className={`text-sm ${language === 'ar' ? 'font-CairoRegular' : 'font-Jakartab'} text-gray-600`}>
+                      {language === 'ar' ? 'نظافة السيارة' : 'Cleanliness'}
+                    </Text>
+                    <Text className={`text-sm ${language === 'ar' ? 'font-Cairobold' : 'font-Jakartab'} text-gray-900`}>
+                      {rating.cleanliness}
+                    </Text>
+                  </View>
+                </View>
+
+                {rating.comment && (
+                  <View className="mt-2 p-2 bg-white rounded-lg">
+                    <Text className={`text-sm ${language === 'ar' ? 'font-CairoRegular' : 'font-Jakartab'} text-gray-600 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                      {rating.comment}
+                    </Text>
+                  </View>
+                )}
+
+                <Text className={`text-xs ${language === 'ar' ? 'font-CairoRegular' : 'font-Jakartab'} text-gray-500 mt-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {rating.ride_details.origin_address} → {rating.ride_details.destination_address}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <ScrollView
@@ -308,7 +481,10 @@ const Profile = () => {
           {/* Action Icons */}
           <View className={`flex-row justify-center ${language === 'ar' ? 'space-x-reverse' : 'space-x-8'} space-x-8`}>
             <TouchableOpacity 
-              onPress={() => router.push('/(root)/settings')}
+              onPress={() => router.push({
+                pathname: '/(root)/settings',
+                params: { isAdmin: userData.isAdmin ? 'true' : 'false' }
+              } as any)}
               className="items-center"
             >
               <View className="bg-gray-100 p-3 rounded-full">
@@ -320,10 +496,7 @@ const Profile = () => {
             </TouchableOpacity>
             
             <TouchableOpacity 
-              onPress={() => Alert.alert(
-                language === 'ar' ? 'قريباً' : 'Coming Soon',
-                language === 'ar' ? 'ستكون ميزة التتبع متاحة قريباً' : 'Track feature will be available soon.'
-              )}
+              onPress={() => router.push('/(root)/track' as any)}
               className="items-center"
             >
               <View className="bg-gray-100 p-3 rounded-full">
@@ -333,6 +506,27 @@ const Profile = () => {
                 {language === 'ar' ? 'التتبع' : 'Track'}
               </Text>
             </TouchableOpacity>
+
+            {userData.isAdmin && (
+              <TouchableOpacity 
+                onPress={() => router.push('/(root)/admin' as any)}
+                className="items-center"
+              >
+                <View className="bg-gray-100 p-3 rounded-full relative">
+                  <MaterialCommunityIcons name="shield-account" size={20} color="#374151" />
+                  {pendingApplicationsCount > 0 && (
+                    <View className="absolute -top-1 -right-1 bg-red-500 rounded-full min-w-[20px] h-5 items-center justify-center px-1">
+                      <Text className="text-white text-xs font-bold">
+                        {pendingApplicationsCount > 99 ? '99+' : pendingApplicationsCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <Text className={`text-xs text-gray-600 mt-1 ${language === 'ar' ? 'font-Cairobold' : 'font-Jakartab'}`}>
+                  {language === 'ar' ? 'لوحة التحكم' : 'Admin'}
+                </Text>
+              </TouchableOpacity>
+            )}
             
             <TouchableOpacity 
               onPress={handleSignOut}
@@ -350,14 +544,18 @@ const Profile = () => {
 
         <View className={`flex-row justify-between w-full mt-4 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
           <View className="items-center bg-white rounded-xl p-4 flex-1 mx-2" style={Platform.OS === 'android' ? styles.androidShadow : styles.iosShadow}>
-            <Text className={`text-2xl ${language === 'ar' ? 'font-Cairobold' : 'font-Jakartab'}`}>{totalRides}</Text>
+            <Text className={`text-2xl ${language === 'ar' ? 'font-Cairobold' : 'font-Jakartab'}`}>
+              {userData.data?.driver?.total_rides || 0}
+            </Text>
             <Text className={`text-gray-500 text-sm ${language === 'ar' ? 'font-Cairobold' : 'font-Jakartab'}`}>
               {language === 'ar' ? 'إجمالي الرحلات' : 'Total Rides'}
             </Text>
           </View>
           <View className="items-center bg-white rounded-xl p-4 flex-1 mx-2" style={Platform.OS === 'android' ? styles.androidShadow : styles.iosShadow}>
             <View className="flex-row items-center">
-              <Text className={`text-2xl ${language === 'ar' ? 'font-Cairobold' : 'font-Jakartab'} mr-1`}>{rating}</Text>
+              <Text className={`text-2xl ${language === 'ar' ? 'font-Cairobold' : 'font-Jakartab'} ${language === 'ar' ? 'mr-1' : 'ml-1'}`}>
+                {userData.data?.driver?.rating?.toFixed(1) || '0.0'}
+              </Text>
               <Image source={icons.star} style={{ width: 20, height: 20 }} />
             </View>
             <Text className={`text-gray-500 text-sm ${language === 'ar' ? 'font-Cairobold' : 'font-Jakartab'}`}>
@@ -369,6 +567,7 @@ const Profile = () => {
         {/* Driver Information Section */}
         {userData.isDriver && (
           <>
+            {renderDetailedRatings()}
             <TouchableOpacity 
               onPress={() => toggleCard('driverInfo')}
               className="bg-white rounded-xl p-5 mt-4" 
@@ -454,13 +653,11 @@ const Profile = () => {
                 </View>
                 {expandedCards.carImage && (
                   <View className="mt-4">
-                    <TouchableOpacity onPress={() => setShowFullCarImage(true)}>
-                      <Image
-                        source={{ uri: userData.data.driver.car_image_url }}
-                        className="w-full h-48 rounded-lg"
-                        resizeMode="cover"
-                      />
-                    </TouchableOpacity>
+                    <Image
+                      source={{ uri: userData.data.driver.car_image_url }}
+                      className="w-full h-48 rounded-lg"
+                      resizeMode="cover"
+                    />
                   </View>
                 )}
               </TouchableOpacity>
@@ -530,34 +727,6 @@ const Profile = () => {
           )}
         </TouchableOpacity>
 
-        {/* Admin Section - Only visible to admins */}
-        {userData.isAdmin && (
-          <View className="bg-white rounded-xl p-5 mt-4">
-            <Text className={`text-lg ${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaBold'} mb-4`}>
-              {language === 'ar' ? 'لوحة التحكم' : 'Admin Dashboard'}
-            </Text>
-            <View className="space-y-4">
-              <TouchableOpacity
-                onPress={() => router.push("/(root)/admin/driverApplications")}
-                className={`flex-row items-center justify-between p-4 bg-gray-50 rounded-lg ${language === 'ar' ? 'flex-row-reverse' : ''}`}
-              >
-                <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                  <MaterialCommunityIcons name="car" size={24} color="#F97316" />
-                  <View className={language === 'ar' ? 'mr-3' : 'ml-3'}>
-                    <Text className={`text-lg ${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaBold'}`}>
-                      {language === 'ar' ? 'طلبات السائقين' : 'Driver Applications'}
-                    </Text>
-                    <Text className={`text-gray-500 text-sm ${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaBold'}`}>
-                      {language === 'ar' ? 'إدارة طلبات التسجيل كسائق' : 'Manage driver registration requests'}
-                    </Text>
-                  </View>
-                </View>
-                <AntDesign name={language === 'ar' ? 'left' : 'right'} size={20} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
         <View className="h-32" />
       </ScrollView>
 
@@ -577,25 +746,6 @@ const Profile = () => {
               uri: userData.profileImage || user?.imageUrl || 'https://www.pngitem.com/pimgs/m/146-1468479_my-profile-icon-blank-profile-picture-circle-hd.png'
             }}
             className="w-80 h-80 rounded-xl"
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Full Car Image Modal */}
-      <Modal
-        visible={showFullCarImage}
-        transparent={true}
-        onRequestClose={() => setShowFullCarImage(false)}
-      >
-        <TouchableOpacity 
-          className="flex-1 bg-black/90 items-center justify-center"
-          onPress={() => setShowFullCarImage(false)}
-          activeOpacity={1}
-        >
-          <Image
-            source={{ uri: userData.data?.driver?.car_image_url }}
-            className="w-full h-96"
             resizeMode="contain"
           />
         </TouchableOpacity>

@@ -9,6 +9,8 @@ import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { uploadImageToCloudinary } from "@/lib/upload";
 import * as ImagePicker from "expo-image-picker";
+import uploadIcon from '@/assets/icons/upload.png';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
 interface UserData {
   driver?: {
@@ -28,6 +30,7 @@ const ProfileEdit = () => {
   const { signOut } = useAuth();
   const { language } = useLanguage();
   const router = useRouter();
+  const storage = getStorage();
 
   const [userData, setUserData] = useState<{
     isDriver: boolean;
@@ -128,91 +131,6 @@ const ProfileEdit = () => {
     };
   }, [user?.id, user?.imageUrl]);
 
-  const handleImagePick = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          language === 'ar' ? 'تم رفض الإذن' : 'Permission Denied',
-          language === 'ar' ? 'يجب منح إذن للوصول إلى مكتبة الصور' : 'You need to grant permission to access media library.'
-        );
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (result.canceled) return;
-
-      const asset = result.assets[0];
-      if (!asset?.uri) return;
-
-      const fileExtension = asset.uri.split('.').pop()?.toLowerCase();
-      if (!['jpg', 'jpeg', 'png'].includes(fileExtension || '')) {
-        Alert.alert(
-          language === 'ar' ? 'خطأ' : 'Error',
-          language === 'ar' ? 'يجب اختيار صورة بصيغة JPG أو PNG' : 'Please select a JPG or PNG image.'
-        );
-        return;
-      }
-
-      setUserData(prev => ({ ...prev, profileImage: asset.uri }));
-      setIsUploading(true);
-
-      const uploadedImageUrl = await uploadImageToCloudinary(asset.uri);
-
-      if (!uploadedImageUrl) {
-        throw new Error(language === 'ar' ? 'فشل في تحميل الصورة' : 'Failed to upload image');
-      }
-
-      if (user?.id) {
-        const userRef = doc(db, 'users', user.id);
-        const userDoc = await getDoc(userRef);
-
-        if (userDoc.exists()) {
-          const userData = userDoc.data() as UserData;
-          if (userData.driver?.is_active) {
-            await updateDoc(userRef, {
-              'driver.profile_image_url': uploadedImageUrl,
-            });
-          } else {
-            await updateDoc(userRef, {
-              profile_image_url: uploadedImageUrl,
-            });
-          }
-        } else {
-          await setDoc(userRef, {
-            userId: user.id,
-            email: user.primaryEmailAddress?.emailAddress,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            createdAt: new Date().toISOString(),
-            profile_image_url: uploadedImageUrl,
-          });
-        }
-
-        setUserData(prev => ({ ...prev, profileImage: uploadedImageUrl }));
-        Alert.alert(
-          language === 'ar' ? 'نجاح' : 'Success',
-          language === 'ar' ? 'تم تحديث صورة البروفايل بنجاح' : 'Profile picture updated successfully'
-        );
-      }
-    } catch (error) {
-      console.error('Profile image upload error:', error);
-      Alert.alert(
-        language === 'ar' ? 'خطأ' : 'Error',
-        language === 'ar' ? 'حدث خطأ أثناء تحديث صورة البروفايل' : 'Error updating profile picture'
-      );
-      setUserData(prev => ({ ...prev, profileImage: user?.imageUrl || null }));
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   const handleEditField = async (field: string) => {
     if (!user?.id) return;
 
@@ -220,10 +138,19 @@ const ProfileEdit = () => {
       const userRef = doc(db, 'users', user.id);
       if (field === 'carType') {
         await updateDoc(userRef, { 'driver.car_type': editValues.carType });
-        setUserData(prev => ({
-          ...prev,
-          data: { ...prev.data, driver: { ...prev.data?.driver, car_type: editValues.carType } },
-        }));
+        setUserData(prev => {
+          if (!prev.data?.driver) return prev;
+          return {
+            ...prev,
+            data: {
+              ...prev.data,
+              driver: {
+                ...prev.data.driver,
+                car_type: editValues.carType,
+              }
+            }
+          };
+        });
       } else if (field === 'carSeats') {
         const seats = parseInt(editValues.carSeats, 10);
         if (isNaN(seats) || seats < 1) {
@@ -234,10 +161,19 @@ const ProfileEdit = () => {
           return;
         }
         await updateDoc(userRef, { 'driver.car_seats': seats });
-        setUserData(prev => ({
-          ...prev,
-          data: { ...prev.data, driver: { ...prev.data?.driver, car_seats: seats } },
-        }));
+        setUserData(prev => {
+          if (!prev.data?.driver) return prev;
+          return {
+            ...prev,
+            data: {
+              ...prev.data,
+              driver: {
+                ...prev.data.driver,
+                car_seats: seats,
+              }
+            }
+          };
+        });
       } else if (field === 'phoneNumber') {
         await user?.update({ unsafeMetadata: { phoneNumber: editValues.phoneNumber } });
       }
@@ -257,8 +193,113 @@ const ProfileEdit = () => {
     }
   };
 
+  const handleImagePick = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+
+      if (!result.canceled) {
+        setIsUploading(true);
+        const response = await fetch(result.assets[0].uri);
+        const blob = await response.blob();
+        const filename = result.assets[0].uri.substring(result.assets[0].uri.lastIndexOf('/') + 1);
+        const imageRef = storageRef(storage, `profile_images/${user?.id}/${filename}`);
+        await uploadBytes(imageRef, blob);
+        const url = await getDownloadURL(imageRef);
+        await user?.update({ unsafeMetadata: { profileImageUrl: url } });
+        setUserData(prev => ({ ...prev, profileImage: url }));
+        Alert.alert(
+          language === 'ar' ? 'نجاح' : 'Success',
+          language === 'ar' ? 'تم تحديث الصورة بنجاح' : 'Image updated successfully'
+        );
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        language === 'ar' ? 'حدث خطأ أثناء تحديث الصورة' : 'Error updating image'
+      );
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleCarImagePick = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.5,
+      });
+
+      if (!result.canceled) {
+        setIsUploading(true);
+        const response = await fetch(result.assets[0].uri);
+        const blob = await response.blob();
+        const filename = result.assets[0].uri.substring(result.assets[0].uri.lastIndexOf('/') + 1);
+        const imageRef = storageRef(storage, `car_images/${user?.id}/${filename}`);
+        await uploadBytes(imageRef, blob);
+        const url = await getDownloadURL(imageRef);
+        const userRef = doc(db, 'users', user?.id || '');
+        await updateDoc(userRef, {
+          'driver.car_image_url': url
+        });
+        setUserData(prev => {
+          if (!prev.data) return prev;
+          return {
+            ...prev,
+            data: {
+              ...prev.data,
+              driver: {
+                ...prev.data.driver,
+                car_image_url: url,
+                is_active: prev.data.driver?.is_active || false,
+                car_type: prev.data.driver?.car_type || '',
+                car_seats: prev.data.driver?.car_seats || 0,
+                profile_image_url: prev.data.driver?.profile_image_url || '',
+                created_at: prev.data.driver?.created_at || new Date().toISOString()
+              }
+            }
+          };
+        });
+        Alert.alert(
+          language === 'ar' ? 'نجاح' : 'Success',
+          language === 'ar' ? 'تم تحديث صورة السيارة بنجاح' : 'Car image updated successfully'
+        );
+      }
+    } catch (error) {
+      console.error('Error uploading car image:', error);
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        language === 'ar' ? 'حدث خطأ أثناء تحديث صورة السيارة' : 'Error updating car image'
+      );
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-white">
+      {/* Header */}
+      <View className={`px-5 py-4 flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : ''} justify-between border-b border-gray-200`}>
+        <TouchableOpacity onPress={() => router.back()} className="p-2">
+          <MaterialIcons 
+            name={language === 'ar' ? "chevron-right" : "chevron-left"} 
+            size={24} 
+            color="#374151"
+          />
+        </TouchableOpacity>
+        <Text className="text-lg font-bold text-gray-800">
+          {language === 'ar' ? 'تعديل الملف' : 'Profile Edit'}
+        </Text>
+        <View style={{ width: 40 }} /> {/* Empty view for balanced spacing */}
+      </View>
+
       <ScrollView
         refreshControl={
           <RefreshControl
@@ -276,38 +317,83 @@ const ProfileEdit = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Header */}
-        <View className="items-center mt-6 mb-4">
-          <TouchableOpacity onPress={() => setShowFullImage(true)} className="relative">
-            {userData.profileImage || user?.imageUrl ? (
-              <Image
-                source={{ uri: userData.profileImage || user?.imageUrl }}
-                className="w-28 h-28 rounded-full"
-              />
-            ) : (
-              <View className="w-28 h-28 rounded-full bg-white items-center justify-center border-2 border-orange-500">
-                <MaterialIcons name="person" size={60} color="#f97316" />
+        <View className="mt-6 mb-4">
+          <View className="flex-row justify-between px-2">
+            {/* Profile Picture Box */}
+            <View className="w-[48%]">
+              <TouchableOpacity 
+                onPress={() => setShowFullImage(true)} 
+                className="bg-snow rounded-xl p-3 items-center border border-gray-200"
+              >
+                {userData.profileImage || user?.imageUrl ? (
+                  <Image
+                    source={{ uri: userData.profileImage || user?.imageUrl }}
+                    className="w-32 h-32 rounded-lg"
+                    resizeMode="cover"
+                  />
+                ) : null}
+                {isUploading && (
+                  <View className="absolute inset-0 bg-black/50 rounded-lg items-center justify-center">
+                    <ActivityIndicator color="white" />
+                  </View>
+                )}
+                <TouchableOpacity
+                  onPress={handleImagePick}
+                  className="absolute bottom-1 right-1 rounded-full p-2"
+                >
+                  <Image source={uploadIcon} style={{ width: 24, height: 24 }} />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
+
+            {/* Car Photo Box - Only show if user is a driver */}
+            {userData.isDriver && userData.data?.driver?.car_image_url && (
+              <View className="w-[48%]">
+                <TouchableOpacity 
+                  onPress={() => setShowFullCarImage(true)} 
+                  className="bg-snow rounded-xl p-3 items-center border border-gray-200"
+                >
+                  <Image
+                    source={{ uri: userData.data.driver.car_image_url }}
+                    className="w-32 h-32 rounded-lg"
+                    resizeMode="cover"
+                  />
+                  <TouchableOpacity
+                    onPress={handleCarImagePick}
+                    className="absolute bottom-1 right-1 rounded-full p-2"
+                  >
+                    <Image source={uploadIcon} style={{ width: 24, height: 24 }} />
+                  </TouchableOpacity>
+                </TouchableOpacity>
               </View>
             )}
-            {isUploading && (
-              <View className="absolute inset-0 bg-black/50 rounded-full items-center justify-center">
-                <ActivityIndicator color="white" />
-              </View>
-            )}
-            <TouchableOpacity
-              onPress={handleImagePick}
-              className={`absolute bottom-0 ${language === 'ar' ? 'left-0' : 'right-0'} bg-gray-800 rounded-full p-2`}
-            >
-              <MaterialCommunityIcons name="camera" size={16} color="white" />
-            </TouchableOpacity>
-          </TouchableOpacity>
-          <View className="flex-row items-center mt-2">
-            <Text className={`text-xl font-bold ${language === 'ar' ? 'font-Cairobold' : 'font-Jakartab'}`}>
-              {user?.fullName || "John Doe"}
-            </Text>
           </View>
-          <Text className="text-gray-500 text-sm mt-1">
-            {user?.primaryEmailAddress?.emailAddress || "john@example.com"}
-          </Text>
+
+          <View className="mt-4">
+            {/* Name Field */}
+            <View className="mb-4">
+              <Text className={`text-gray-500 text-sm mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'الاسم الكامل' : 'Full Name'}
+              </Text>
+              <View className={`bg-snow rounded-lg p-3 flex-row items-center justify-between border border-gray-200 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                <Text className={`text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {user?.fullName || (language === 'ar' ? 'غير محدد' : 'Not specified')}
+                </Text>
+              </View>
+            </View>
+
+            {/* Email Field */}
+            <View className="mb-4">
+              <Text className={`text-gray-500 text-sm mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'البريد الإلكتروني' : 'Email Address'}
+              </Text>
+              <View className={`bg-snow rounded-lg p-3 flex-row items-center justify-between border border-gray-200 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                <Text className={`text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {user?.primaryEmailAddress?.emailAddress || (language === 'ar' ? 'غير محدد' : 'Not specified')}
+                </Text>
+              </View>
+            </View>
+          </View>
         </View>
 
         {/* Editable Fields */}
@@ -315,18 +401,22 @@ const ProfileEdit = () => {
           <>
             {/* Car Type */}
             <View className="mb-4">
-              <Text className="text-gray-500 text-sm mb-1">Car Type</Text>
-              <View className="bg-gray-100 rounded-lg p-3 flex-row items-center justify-between">
+              <Text className={`text-gray-500 text-sm mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'نوع السيارة' : 'Car Type'}
+              </Text>
+              <View className={`bg-snow rounded-lg p-3 flex-row items-center justify-between border border-gray-200 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
                 {editingField === 'carType' ? (
                   <TextInput
                     value={editValues.carType}
                     onChangeText={(text) => setEditValues(prev => ({ ...prev, carType: text }))}
-                    className="flex-1 text-base text-gray-800"
+                    className={`flex-1 text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}
                     autoFocus
+                    placeholder={language === 'ar' ? 'أدخل نوع السيارة' : 'Enter car type'}
+                    textAlign={language === 'ar' ? 'right' : 'left'}
                   />
                 ) : (
-                  <Text className="text-base text-gray-800">
-                    {userData.data?.driver?.car_type || 'Not specified'}
+                  <Text className={`text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                    {userData.data?.driver?.car_type || (language === 'ar' ? 'غير محدد' : 'Not specified')}
                   </Text>
                 )}
                 <TouchableOpacity
@@ -349,18 +439,22 @@ const ProfileEdit = () => {
 
             {/* Car Seats */}
             <View className="mb-4">
-              <Text className="text-gray-500 text-sm mb-1">Car Seats</Text>
-              <View className="bg-gray-100 rounded-lg p-3 flex-row items-center justify-between">
+              <Text className={`text-gray-500 text-sm mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'عدد المقاعد' : 'Car Seats'}
+              </Text>
+              <View className={`bg-snow rounded-lg p-3 flex-row items-center justify-between border border-gray-200 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
                 {editingField === 'carSeats' ? (
                   <TextInput
                     value={editValues.carSeats}
                     onChangeText={(text) => setEditValues(prev => ({ ...prev, carSeats: text }))}
-                    className="flex-1 text-base text-gray-800"
+                    className={`flex-1 text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}
                     keyboardType="numeric"
                     autoFocus
+                    placeholder={language === 'ar' ? 'أدخل عدد المقاعد' : 'Enter number of seats'}
+                    textAlign={language === 'ar' ? 'right' : 'left'}
                   />
                 ) : (
-                  <Text className="text-base text-gray-800">
+                  <Text className={`text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                     {userData.data?.driver?.car_seats || 0}
                   </Text>
                 )}
@@ -381,40 +475,29 @@ const ProfileEdit = () => {
                 </TouchableOpacity>
               </View>
             </View>
-
-            {/* Car Image */}
-            {userData.data?.driver?.car_image_url && (
-              <View className="mb-4">
-                <Text className="text-gray-500 text-sm mb-1">Car Image</Text>
-                <TouchableOpacity
-                  onPress={() => setShowFullCarImage(true)}
-                  className="bg-gray-100 rounded-lg p-3 flex-row items-center justify-between"
-                >
-                  <Image
-                    source={{ uri: userData.data.driver.car_image_url }}
-                    className="w-16 h-10 rounded-lg"
-                  />
-                  <MaterialIcons name="edit" size={18} color="#f97316" />
-                </TouchableOpacity>
-              </View>
-            )}
           </>
         )}
 
         {/* Phone Number */}
         <View className="mb-4">
-          <Text className="text-gray-500 text-sm mb-1">Phone Number</Text>
-          <View className="bg-gray-100 rounded-lg p-3 flex-row items-center justify-between">
+          <Text className={`text-gray-500 text-sm mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+            {language === 'ar' ? 'رقم الهاتف' : 'Phone Number'}
+          </Text>
+          <View className={`bg-snow rounded-lg p-3 flex-row items-center justify-between border border-gray-200 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
             {editingField === 'phoneNumber' ? (
               <TextInput
                 value={editValues.phoneNumber}
                 onChangeText={(text) => setEditValues(prev => ({ ...prev, phoneNumber: text }))}
-                className="flex-1 text-base text-gray-800"
+                className={`flex-1 text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}
                 keyboardType="phone-pad"
                 autoFocus
+                placeholder={language === 'ar' ? 'أدخل رقم الهاتف' : 'Enter phone number'}
+                textAlign={language === 'ar' ? 'right' : 'left'}
               />
             ) : (
-              <Text className="text-base text-gray-800">{phoneNumber}</Text>
+              <Text className={`text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {phoneNumber}
+              </Text>
             )}
             <TouchableOpacity
               onPress={() => {
@@ -434,46 +517,6 @@ const ProfileEdit = () => {
           </View>
         </View>
       </ScrollView>
-
-      {/* Full Image Modal */}
-      <Modal
-        visible={showFullImage}
-        transparent={true}
-        onRequestClose={() => setShowFullImage(false)}
-      >
-        <TouchableOpacity
-          className="flex-1 bg-black/90 items-center justify-center"
-          onPress={() => setShowFullImage(false)}
-          activeOpacity={1}
-        >
-          <Image
-            source={{
-              uri: userData.profileImage || user?.imageUrl || 'https://www.pngitem.com/pimgs/m/146-1468479_my-profile-icon-blank-profile-picture-circle-hd.png',
-            }}
-            className="w-80 h-80 rounded-xl"
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Full Car Image Modal */}
-      <Modal
-        visible={showFullCarImage}
-        transparent={true}
-        onRequestClose={() => setShowFullCarImage(false)}
-      >
-        <TouchableOpacity
-          className="flex-1 bg-black/90 items-center justify-center"
-          onPress={() => setShowFullCarImage(false)}
-          activeOpacity={1}
-        >
-          <Image
-            source={{ uri: userData.data?.driver?.car_image_url }}
-            className="w-full h-96"
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
-      </Modal>
     </SafeAreaView>
   );
 };

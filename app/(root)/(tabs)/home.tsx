@@ -24,21 +24,41 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useLanguage } from "@/context/LanguageContext";
 import GoogleTextInput from "@/components/GoogleTextInput";
 import { useNavigation, DrawerActions } from '@react-navigation/native';
+import { DrawerNavigationProp } from '@react-navigation/drawer';
 
-function CustomDrawerMenuIcon() {
-  // Custom menu icon: three lines, middle one shorter and darker (now orange)
+function CustomMenuIcon({ isRTL }: { isRTL: boolean }) {
   return (
-    <View style={{ width: 28, height: 28, justifyContent: 'center', alignItems: 'center' }}>
-      <View style={{ width: 22, height: 4, backgroundColor: '#f97316', borderRadius: 2, marginBottom: 3 }} />
-      <View style={{ width: 14, height: 4, backgroundColor: '#333', borderRadius: 2, marginBottom: 3 }} />
-      <View style={{ width: 22, height: 4, backgroundColor: '#f97316', borderRadius: 2 }} />
+    <View style={{ width: 24, height: 24, justifyContent: 'center' }}>
+      <View style={{ 
+        width: 24, 
+        height: 2.5, 
+        backgroundColor: '#f97316', 
+        borderRadius: 2, 
+        marginBottom: 5,
+        alignSelf: isRTL ? 'flex-end' : 'flex-start'
+      }} />
+      <View style={{ 
+        width: 16, 
+        height: 2.5, 
+        backgroundColor: '#f97316', 
+        borderRadius: 2, 
+        marginBottom: 5,
+        alignSelf: isRTL ? 'flex-end' : 'flex-start'
+      }} />
+      <View style={{ 
+        width: 20, 
+        height: 2.5, 
+        backgroundColor: '#f97316', 
+        borderRadius: 2,
+        alignSelf: isRTL ? 'flex-end' : 'flex-start'
+      }} />
     </View>
   );
 }
 
 export default function Home() {
   const { setIsMenuVisible } = require('@/context/MenuContext').useMenu();
-  const { t, language, setLanguage } = useLanguage();
+  const { t, language, setLanguage, isRTL } = useLanguage();
   const { setUserLocation, setDestinationLocation } = useLocationStore();
   const { unreadCount } = useNotifications();
   const { user } = useUser();
@@ -48,7 +68,11 @@ export default function Home() {
   const [isDriver, setIsDriver] = useState<boolean>(false);
   const [isCheckingDriver, setIsCheckingDriver] = useState<boolean>(true);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
-  const navigation = useNavigation();
+  const navigation = useNavigation<DrawerNavigationProp<any>>();
+
+  const openDrawer = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
 
   const checkIfUserIsDriver = async () => {
     if (!user?.id) {
@@ -185,89 +209,173 @@ export default function Home() {
     navigation.setOptions({
       header: () => (
         <View className="flex-row items-center justify-between px-4 py-3 bg-white border-b border-gray-100">
-          <TouchableOpacity 
-            onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
-            className="w-10 h-10 items-center justify-center rounded-full bg-gray-100"
-          >
-            <CustomDrawerMenuIcon />
-          </TouchableOpacity>
-          
-          <Text className="text-xl font-bold text-gray-900">Home</Text>
-          
-          <View className="flex-row items-center">
-            <TouchableOpacity
-              onPress={() => router.push('/(root)/notifications')}
-              className="w-10 h-10 items-center justify-center rounded-full bg-gray-100 mr-2"
-            >
-              <MaterialIcons name="notifications-none" size={24} color="#f97316" />
-              {unreadCount > 0 && (
-                <View className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full items-center justify-center">
-                  <Text className="text-[10px] text-white font-bold">{unreadCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              onPress={() => router.push('/(root)/profile')}
-              className="w-10 h-10 items-center justify-center rounded-full bg-gray-100 overflow-hidden"
-            >
-              {profileImageUrl ? (
-                <Image
-                  source={{ uri: profileImageUrl }}
-                  style={{ width: 40, height: 40, borderRadius: 20 }}
-                  resizeMode="cover"
-                />
-              ) : (
-                <MaterialIcons name="person" size={24} color="#f97316" />
-              )}
-            </TouchableOpacity>
-          </View>
+          {isRTL ? (
+            <>
+              <View className="flex-row items-center space-x-2">
+                <TouchableOpacity
+                  onPress={() => router.push('/(root)/profilePage')}
+                  className="w-10 h-10 items-center justify-center rounded-full bg-gray-100 overflow-hidden"
+                >
+                  {profileImageUrl ? (
+                    <Image
+                      source={{ uri: profileImageUrl }}
+                      style={{ width: 40, height: 40, borderRadius: 20 }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <MaterialIcons name="person" size={24} color="#f97316" />
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => router.push('/(root)/notifications')}
+                  className="w-10 h-10 items-center justify-center"
+                >
+                  <MaterialIcons name="notifications" size={24} color="#f97316" />
+                  {unreadCount > 0 && (
+                    <View className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full items-center justify-center">
+                      <Text className="text-[10px] text-white font-bold">{unreadCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+              <View className="absolute left-0 right-0 items-center">
+                <Text className="text-xl font-bold text-gray-900">{t.Home}</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => navigation.openDrawer()}
+                className="w-10 h-10 items-center justify-center"
+              >
+                <CustomMenuIcon isRTL={isRTL} />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity
+                onPress={() => navigation.openDrawer()}
+                className="w-10 h-10 items-center justify-center"
+              >
+                <CustomMenuIcon isRTL={isRTL} />
+              </TouchableOpacity>
+              <View className="absolute left-0 right-0 items-center">
+                <Text className="text-xl font-bold text-gray-900">{t.Home}</Text>
+              </View>
+              <View className="flex-row items-center space-x-2">
+                <TouchableOpacity
+                  onPress={() => router.push('/(root)/profilePage')}
+                  className="w-10 h-10 items-center justify-center rounded-full bg-gray-100 overflow-hidden"
+                >
+                  {profileImageUrl ? (
+                    <Image
+                      source={{ uri: profileImageUrl }}
+                      style={{ width: 40, height: 40, borderRadius: 20 }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <MaterialIcons name="person" size={24} color="#f97316" />
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => router.push('/(root)/notifications')}
+                  className="w-10 h-10 items-center justify-center"
+                >
+                  <MaterialIcons name="notifications" size={24} color="#f97316" />
+                  {unreadCount > 0 && (
+                    <View className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full items-center justify-center">
+                      <Text className="text-[10px] text-white font-bold">{unreadCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
         </View>
       ),
     });
-  }, [navigation, unreadCount, profileImageUrl]);
+  }, [navigation, unreadCount, profileImageUrl, isRTL]);
 
   return (
     <SafeAreaView className="bg-general-500 flex-1">
       {/* Header */}
       <View className="flex-row items-center justify-between px-4 py-3 bg-white border-b border-gray-100">
-        <TouchableOpacity 
-          onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
-          className="w-10 h-10 items-center justify-center rounded-full bg-gray-100"
-        >
-          <CustomDrawerMenuIcon />
-        </TouchableOpacity>
-        
-        <Text className="text-xl font-bold text-gray-900">Home</Text>
-        
-        <View className="flex-row items-center">
-          <TouchableOpacity
-            onPress={() => router.push('/(root)/notifications')}
-            className="w-10 h-10 items-center justify-center rounded-full bg-gray-100 mr-2"
-          >
-            <MaterialIcons name="notifications-none" size={24} color="#f97316" />
-            {unreadCount > 0 && (
-              <View className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full items-center justify-center">
-                <Text className="text-[10px] text-white font-bold">{unreadCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            onPress={() => router.push('/(root)/profile')}
-            className="w-10 h-10 items-center justify-center rounded-full bg-gray-100 overflow-hidden"
-          >
-            {profileImageUrl ? (
-              <Image
-                source={{ uri: profileImageUrl }}
-                style={{ width: 40, height: 40, borderRadius: 20 }}
-                resizeMode="cover"
-              />
-            ) : (
-              <MaterialIcons name="person" size={24} color="#f97316" />
-            )}
-          </TouchableOpacity>
-        </View>
+        {isRTL ? (
+          <>
+            <View className="flex-row items-center space-x-2">
+              <TouchableOpacity
+                onPress={() => router.push('/(root)/profilePage')}
+                className="w-10 h-10 items-center justify-center rounded-full bg-gray-100 overflow-hidden"
+              >
+                {profileImageUrl ? (
+                  <Image
+                    source={{ uri: profileImageUrl }}
+                    style={{ width: 40, height: 40, borderRadius: 20 }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <MaterialIcons name="person" size={24} color="#f97316" />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.push('/(root)/notifications')}
+                className="w-10 h-10 items-center justify-center"
+              >
+                <MaterialIcons name="notifications" size={24} color="#f97316" />
+                {unreadCount > 0 && (
+                  <View className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full items-center justify-center">
+                    <Text className="text-[10px] text-white font-bold">{unreadCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+            <View className="absolute left-0 right-0 items-center">
+              <Text className="text-xl font-bold text-gray-900">{t.Home}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => navigation.openDrawer()}
+              className="w-10 h-10 items-center justify-center"
+            >
+              <CustomMenuIcon isRTL={isRTL} />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity
+              onPress={() => navigation.openDrawer()}
+              className="w-10 h-10 items-center justify-center"
+            >
+              <CustomMenuIcon isRTL={isRTL} />
+            </TouchableOpacity>
+            <View className="absolute left-0 right-0 items-center">
+              <Text className="text-xl font-bold text-gray-900">{t.Home}</Text>
+            </View>
+            <View className="flex-row items-center space-x-2">
+              <TouchableOpacity
+                onPress={() => router.push('/(root)/profilePage')}
+                className="w-10 h-10 items-center justify-center rounded-full bg-gray-100 overflow-hidden"
+              >
+                {profileImageUrl ? (
+                  <Image
+                    source={{ uri: profileImageUrl }}
+                    style={{ width: 40, height: 40, borderRadius: 20 }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <MaterialIcons name="person" size={24} color="#f97316" />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.push('/(root)/notifications')}
+                className="w-10 h-10 items-center justify-center"
+              >
+                <MaterialIcons name="notifications" size={24} color="#f97316" />
+                {unreadCount > 0 && (
+                  <View className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full items-center justify-center">
+                    <Text className="text-[10px] text-white font-bold">{unreadCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </View>
 
       {/* Content with Barrier Section below Header */}
