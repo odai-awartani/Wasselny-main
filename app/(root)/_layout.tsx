@@ -1,64 +1,43 @@
-import { Drawer } from 'expo-router/drawer'
-import SideMenu from '@/components/SideMenu' // adjust path if needed
+import { Stack } from 'expo-router'
 import React from 'react'
 import { NotificationProvider } from '@/context/NotificationContext'
 
-export default function RootLayout() {
+const RootLayout = () => {
   return (
     <NotificationProvider>
-      <Drawer
-        screenOptions={{
-          headerShown: false,
-          drawerStyle: {
-            backgroundColor: 'transparent',
-            width: 280,
-          },
-        }}
-        drawerContent={() => <SideMenu />}
-      >
-        <Drawer.Screen
-          name="(tabs)"
-          options={{
-            drawerLabel: 'Home',
-          }}
-        />
-        <Drawer.Screen
-          name="notifications"
-          options={{
-            drawerLabel: 'Notifications',
-          }}
-        />
-        <Drawer.Screen
-          name="profile"
-          options={{
-            drawerLabel: 'Profile',
-          }}
-        />
-        <Drawer.Screen
-          name="settings"
-          options={{
-            drawerLabel: 'Settings',
-          }}
-        />
-        <Drawer.Screen
-          name="find-ride"
-          options={{
-            drawerLabel: 'Find Ride',
-          }}
-        />
-        <Drawer.Screen
-          name="ride-details"
-          options={{
-            drawerLabel: 'Ride Details',
-          }}
-        />
-        <Drawer.Screen
-          name="profilePageEdit"
-          options={{
-            drawerLabel: 'Edit Profile',
-          }}
-        />
-      </Drawer>
+      <Stack>
+               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+               <Stack.Screen name="find-ride" options={{ headerShown: false }} />
+               <Stack.Screen name="confirm-ride" options={{ headerShown: false }} />
+               <Stack.Screen name="book-ride" options={{ headerShown: false }} /> 
+               <Stack.Screen name="rideInfo" options={{ headerShown: false }} /> 
+               <Stack.Screen name="carInfo" options={{ headerShown: false }} />
+               <Stack.Screen name="locationInfo" options={{ headerShown: false }} />
+               <Stack.Screen name="ride-details" options={{ headerShown: false }} />
+               <Stack.Screen name="driver-profile" options={{ headerShown: false }} />
+               <Stack.Screen name="chat" options={{ headerShown: false }} />
+               <Stack.Screen name="driverInfo" options={{ headerShown: false }} />
+               <Stack.Screen name="notifications" options={{ headerShown: false }} />
+               <Stack.Screen name="test-notification" options={{ headerShown: false }} />
+               <Stack.Screen name="profile" options={{ headerShown: false }} />
+               <Stack.Screen name="create-ride" options={{ headerShown: false }} />
+               <Stack.Screen name="admin" options={{ headerShown: false }} />
+               <Stack.Screen name="ride-requests" options={{ headerShown: false }} />
+               <Stack.Screen name="cityCheckpoints" options={{ headerShown: false }} />
+               <Stack.Screen name="checkpointDetails" options={{ headerShown: false }} />
+
+               
+
+
+               
+
+
+
+               
+          
+            </Stack>
     </NotificationProvider>
   )
 }
+
+export default RootLayout
